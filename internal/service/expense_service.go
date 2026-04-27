@@ -1,0 +1,90 @@
+package service
+
+import (
+	"context"
+	"errors"
+
+	"expenses/internal/model"
+	"expenses/internal/repository"
+)
+
+var (
+	ErrInvalidAmount   = errors.New("amount must be positive")
+	ErrInvalidCurrency = errors.New("currency must be a 3-letter ISO 4217 code")
+)
+
+type ExpenseService struct {
+	expenses *repository.ExpenseRepository
+	tags     *repository.TagRepository
+}
+
+func NewExpenseService(expenses *repository.ExpenseRepository, tags *repository.TagRepository) *ExpenseService {
+	return &ExpenseService{expenses: expenses, tags: tags}
+}
+
+func (s *ExpenseService) Create(ctx context.Context, e *model.Expense, tagIDs []int64) error {
+	if err := validateExpense(e); err != nil {
+		return err
+	}
+	if err := s.expenses.Create(ctx, e, tagIDs); err != nil {
+		return err
+	}
+	return s.attachTags(ctx, e)
+}
+
+func (s *ExpenseService) Get(ctx context.Context, id int64) (*model.Expense, error) {
+	e, err := s.expenses.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.attachTags(ctx, e); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+func (s *ExpenseService) List(ctx context.Context, f repository.ExpenseFilter) ([]model.Expense, error) {
+	expenses, err := s.expenses.List(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	for i := range expenses {
+		if err := s.attachTags(ctx, &expenses[i]); err != nil {
+			return nil, err
+		}
+	}
+	return expenses, nil
+}
+
+func (s *ExpenseService) Update(ctx context.Context, e *model.Expense, tagIDs *[]int64) error {
+	if err := validateExpense(e); err != nil {
+		return err
+	}
+	if err := s.expenses.Update(ctx, e, tagIDs); err != nil {
+		return err
+	}
+	return s.attachTags(ctx, e)
+}
+
+func (s *ExpenseService) Delete(ctx context.Context, id int64) error {
+	return s.expenses.SoftDelete(ctx, id)
+}
+
+func (s *ExpenseService) attachTags(ctx context.Context, e *model.Expense) error {
+	tags, err := s.tags.ListByExpenseID(ctx, e.ExpenseID)
+	if err != nil {
+		return err
+	}
+	e.Tags = tags
+	return nil
+}
+
+func validateExpense(e *model.Expense) error {
+	if e.Amount <= 0 {
+		return ErrInvalidAmount
+	}
+	if len(e.Currency) != 3 {
+		return ErrInvalidCurrency
+	}
+	return nil
+}
