@@ -113,6 +113,14 @@ curl -s -X POST http://localhost:8080/api/v1/expenses \
   }' | jq
 ```
 
+### 2.1 Bulk upload expenses
+
+```bash
+curl -X POST http://localhost:8080/api/v1/expenses/upload \
+  -F "file=@expenses.csv" \
+  -H "Accept: application/json"
+```
+
 ### 3. Get a single expense by ID
 
 ```bash
