@@ -29,13 +29,14 @@
 
 	onMount(async () => {
 		try {
-			const [e, c, t, p] = await Promise.all([
-				expensesApi.list({ limit: 100 }),
+			const [paginated, c, t, p] = await Promise.all([
+				expensesApi.list({ limit: 100 }), // now returns PaginatedExpenseList
 				categoriesApi.list(),
 				tagsApi.list(),
 				paymentMethodsApi.list()
 			]);
-			expenses = e ?? [];
+			// Extract only the expenses array from the paginated response
+			expenses = paginated?.expenses ?? [];
 			categories = c ?? [];
 			tags = t ?? [];
 			paymentMethods = p ?? [];

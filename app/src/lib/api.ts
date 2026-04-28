@@ -12,6 +12,14 @@ import type {
 
 const BASE_URL = 'http://localhost:8080';
 
+// Add the paginated interface to match the backend PaginatedExpenseList struct
+export interface PaginatedExpenseList {
+	expenses: Expense[];
+	total_count: number;
+	limit: number;
+	offset: number;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(`${BASE_URL}${path}`, {
 		...init,
@@ -103,8 +111,9 @@ export const paymentMethodsApi = {
 };
 
 export const expensesApi = {
+	// Updated return type to PaginatedExpenseList
 	list: (filters: ExpenseListFilters = {}) =>
-		request<Expense[]>(`/api/v1/expenses${toQuery(filters as Record<string, unknown>)}`),
+		request<PaginatedExpenseList>(`/api/v1/expenses${toQuery(filters as Record<string, unknown>)}`),
 	get: (id: number) => request<Expense>(`/api/v1/expenses/${id}`),
 	create: (body: ExpenseInput) =>
 		request<Expense>('/api/v1/expenses', {

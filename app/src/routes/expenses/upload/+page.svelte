@@ -47,30 +47,30 @@
 	}
 
 	function parseCsv() {
-        if (!file) return;
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                // 1. Cast PapaParse output from unknown[] to an array of string Records
-                const rawData = results.data as Record<string, string>[];
+		if (!file) return;
+		Papa.parse(file, {
+			header: true,
+			skipEmptyLines: true,
+			complete: (results) => {
+				// 1. Cast PapaParse output from unknown[] to an array of string Records
+				const rawData = results.data as Record<string, string>[];
 
-                // 2. Explicitly map every field to satisfy the ParsedRow interface perfectly
-                parsedRows = rawData.map((row) => ({
-                    expense_date: row.expense_date || '',
-                    amount: Number(row.amount) || 0,
-                    category_id: Number(row.category_id) || 0,
-                    payment_method_id: Number(row.payment_method_id) || 0,
-                    currency: row.currency || '',
-                    merchant_name: row.merchant_name || '',
-                    description: row.description || '',
-                    tag_ids: row.tag_ids ? row.tag_ids.split(',').map(Number) : [],
-                }));
-                
-                step = 'edit';
-            }
-        });
-    }
+				// 2. Explicitly map every field to satisfy the ParsedRow interface perfectly
+				parsedRows = rawData.map((row) => ({
+					expense_date: row.expense_date || '',
+					amount: Number(row.amount) || 0,
+					category_id: Number(row.category_id) || 0,
+					payment_method_id: Number(row.payment_method_id) || 0,
+					currency: row.currency || '',
+					merchant_name: row.merchant_name || '',
+					description: row.description || '',
+					tag_ids: row.tag_ids ? row.tag_ids.split(',').map(Number) : [],
+				}));
+
+				step = 'edit';
+			}
+		});
+	}
 
 	async function submitCsv() {
 		step = 'uploading';
@@ -95,7 +95,6 @@
 
 		// 4. Send request to backend
 		try {
-			// Replace with your local host or production API URL
 			const res = await fetch('http://localhost:8080/api/v1/expenses/upload', {
 				method: 'POST',
 				headers: {
@@ -118,8 +117,8 @@
 	}
 </script>
 
-<div class="container">
-	<header>
+<div class="page">
+	<div class="page-header">
 		<h1>Bulk Upload Expenses</h1>
 		{#if step === 'edit'}
 			<div class="actions">
@@ -130,7 +129,7 @@
 				</button>
 			</div>
 		{/if}
-	</header>
+	</div>
 
 	{#if step === 'select'}
 		<div class="upload-box">
@@ -163,7 +162,7 @@
 							<td><input type="number" bind:value={row.amount} /></td>
 							<td><input type="text" style="width: 60px;" bind:value={row.currency} /></td>
 							<td><input type="text" bind:value={row.merchant_name} /></td>
-							
+
 							<td>
 								<select bind:value={row.category_id}>
 									{#each categories as category, index (index)}
@@ -171,7 +170,7 @@
 									{/each}
 								</select>
 							</td>
-							
+
 							<td>
 								<select bind:value={row.payment_method_id}>
 									{#each paymentMethods as pm, index (index)}
@@ -187,7 +186,7 @@
 									{/each}
 								</select>
 							</td>
-							
+
 							<td><input type="text" bind:value={row.description} /></td>
 							<td>
 								<button class="danger" onclick={() => parsedRows.splice(i, 1)}>
@@ -207,12 +206,13 @@
 </div>
 
 <style>
-	header {
+	.page-header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		margin-bottom: 2rem;
 	}
+
 	.upload-box {
 		padding: 3rem;
 		border: 2px dashed var(--border);
@@ -223,13 +223,27 @@
 		gap: 1rem;
 		align-items: center;
 	}
+
 	.table-container {
 		overflow-x: auto;
 	}
-	input, select {
+
+	input,
+	select {
 		width: 100%;
 		padding: 4px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
+	}
+
+	.actions {
+		display: flex;
+		gap: 0.75rem;
+	}
+
+	.loading {
+		padding: 4rem;
+		text-align: center;
+		color: var(--text-muted);
 	}
 </style>
