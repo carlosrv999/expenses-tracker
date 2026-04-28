@@ -131,6 +131,102 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 	return out, rows.Err()
 }
 
+type PaginatedExpenseList struct {
+	Expenses   []model.Expense `json:"expenses"`
+	TotalCount int64           `json:"total_count"`
+	Limit      int             `json:"limit"`
+	Offset     int             `json:"offset"`
+}
+
+// ListPaginated returns expenses with full pagination metadata (items + total count).
+// It reuses the exact same filtering logic as List() for consistency.
+// This is the recommended method when the frontend needs to show "Page X of Y", total records, etc.
+func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) (PaginatedExpenseList, error) {
+	var (
+		conds []string
+		args  []any
+	)
+
+	if !f.IncludeDeleted {
+		conds = append(conds, "deleted_at IS NULL")
+	}
+	if f.CategoryID != nil {
+		args = append(args, *f.CategoryID)
+		conds = append(conds, fmt.Sprintf("category_id = $%d", len(args)))
+	}
+	if f.PaymentMethodID != nil {
+		args = append(args, *f.PaymentMethodID)
+		conds = append(conds, fmt.Sprintf("payment_method_id = $%d", len(args)))
+	}
+
+	where := ""
+	if len(conds) > 0 {
+		where = "WHERE " + strings.Join(conds, " AND ")
+	}
+
+	// 1. Get total count (same filters, no LIMIT/OFFSET)
+	countQuery := fmt.Sprintf(`
+        SELECT COUNT(*)
+        FROM expense
+        %s`, where)
+
+	var totalCount int64
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+		return PaginatedExpenseList{}, err
+	}
+
+	// 2. Get the actual paginated rows
+	limit := 100
+	if f.Limit > 0 && f.Limit <= 500 {
+		limit = f.Limit
+	}
+
+	// Copy filter args and append LIMIT/OFFSET
+	dataArgs := make([]any, len(args))
+	copy(dataArgs, args)
+	dataArgs = append(dataArgs, limit)
+	limitPlaceholder := fmt.Sprintf("$%d", len(dataArgs))
+	dataArgs = append(dataArgs, f.Offset)
+	offsetPlaceholder := fmt.Sprintf("$%d", len(dataArgs))
+
+	query := fmt.Sprintf(`
+        SELECT expense_id, category_id, payment_method_id, currency, amount, expense_date,
+               merchant_name, description, created_at, updated_at, deleted_at
+        FROM expense
+        %s
+        ORDER BY expense_date DESC, expense_id DESC
+        LIMIT %s OFFSET %s`, where, limitPlaceholder, offsetPlaceholder)
+
+	rows, err := r.db.QueryContext(ctx, query, dataArgs...)
+	if err != nil {
+		return PaginatedExpenseList{}, err
+	}
+	defer rows.Close()
+
+	var expenses []model.Expense
+	for rows.Next() {
+		var e model.Expense
+		if err := rows.Scan(
+			&e.ExpenseID, &e.CategoryID, &e.PaymentMethodID, &e.Currency, &e.Amount, &e.ExpenseDate,
+			&e.MerchantName, &e.Description, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
+		); err != nil {
+			return PaginatedExpenseList{}, err
+		}
+		expenses = append(expenses, e)
+	}
+
+	if err := rows.Err(); err != nil {
+		return PaginatedExpenseList{}, err
+	}
+
+	return PaginatedExpenseList{
+		Expenses:   expenses,
+		TotalCount: totalCount,
+		Limit:      limit,
+		Offset:     f.Offset,
+	}, nil
+}
+
 func (r *ExpenseRepository) Update(ctx context.Context, e *model.Expense, tagIDs *[]int64) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

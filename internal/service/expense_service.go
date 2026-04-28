@@ -58,6 +58,23 @@ func (s *ExpenseService) List(ctx context.Context, f repository.ExpenseFilter) (
 	return expenses, nil
 }
 
+// ListPaginated returns a paginated list of expenses (with full metadata) and attaches
+// the associated tags to every expense in the result — exactly like the non-paginated List method.
+func (s *ExpenseService) ListPaginated(ctx context.Context, f repository.ExpenseFilter) (repository.PaginatedExpenseList, error) {
+	result, err := s.expenses.ListPaginated(ctx, f)
+	if err != nil {
+		return repository.PaginatedExpenseList{}, err
+	}
+
+	for i := range result.Expenses {
+		if err := s.attachTags(ctx, &result.Expenses[i]); err != nil {
+			return repository.PaginatedExpenseList{}, err
+		}
+	}
+
+	return result, nil
+}
+
 func (s *ExpenseService) Update(ctx context.Context, e *model.Expense, tagIDs *[]int64) error {
 	if err := validateExpense(e); err != nil {
 		return err
