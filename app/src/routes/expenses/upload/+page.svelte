@@ -64,7 +64,7 @@
 					currency: row.currency || '',
 					merchant_name: row.merchant_name || '',
 					description: row.description || '',
-					tag_ids: row.tag_ids ? row.tag_ids.split(',').map(Number) : [],
+					tag_ids: row.tag_ids ? row.tag_ids.split(',').map(Number) : []
 				}));
 
 				step = 'edit';

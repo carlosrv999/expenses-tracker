@@ -54,7 +54,10 @@
 		<p class="muted">Loading…</p>
 	{:else if categories.length === 0 || paymentMethods.length === 0}
 		<div class="card">
-			<p>You need at least one <a href={resolve('/categories/new')}>category</a> and one <a href={resolve('/payment-methods/new')}>payment method</a> before creating an expense.</p>
+			<p>
+				You need at least one <a href={resolve('/categories/new')}>category</a> and one
+				<a href={resolve('/payment-methods/new')}>payment method</a> before creating an expense.
+			</p>
 		</div>
 	{:else}
 		<ExpenseForm

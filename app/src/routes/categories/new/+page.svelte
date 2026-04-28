@@ -38,5 +38,10 @@
 	{#if error}
 		<div class="error">{error}</div>
 	{/if}
-	<CategoryForm {categories} onSubmit={handleSubmit} {submitting} cancelHref={resolve('/categories')} />
+	<CategoryForm
+		{categories}
+		onSubmit={handleSubmit}
+		{submitting}
+		cancelHref={resolve('/categories')}
+	/>
 </div>

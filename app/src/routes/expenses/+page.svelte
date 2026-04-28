@@ -1,18 +1,26 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { categoriesApi, expensesApi, paymentMethodsApi, tagsApi } from '$lib/api';
+	import { categoriesApi, expensesApi, paymentMethodsApi } from '$lib/api';
 	import { formatAmount, formatDate } from '$lib/format';
 	import type { Category, Expense, ExpenseListFilters, PaymentMethod, Tag } from '$lib/types';
-	import { Receipt, Pencil, Trash2, Plus, Filter, Upload, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import {
+		Receipt,
+		Pencil,
+		Trash2,
+		Plus,
+		Filter,
+		Upload,
+		ChevronLeft,
+		ChevronRight
+	} from 'lucide-svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { resolve } from '$app/paths';
 
 	let expenses: Expense[] = $state([]);
 	let totalCount: number = $state(0);
-	
+
 	let categories: Category[] = $state([]);
 	let paymentMethods: PaymentMethod[] = $state([]);
-	let tags: Tag[] = $state([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -24,15 +32,14 @@
 
 	let categoryById = $derived(new SvelteMap(categories.map((c) => [c.category_id, c])));
 	let pmById = $derived(new SvelteMap(paymentMethods.map((p) => [p.payment_method_id, p])));
-	let tagById = $derived(new SvelteMap(tags.map((t) => [t.tag_id, t])));
 
 	// Pagination Math
 	let currentPage = $derived(Math.floor(offset / filterLimit) + 1);
 	let totalPages = $derived(Math.ceil(totalCount / filterLimit) || 1);
 
-	function expenseTagIds(e: Expense): number[] {
-		if (Array.isArray(e.tag_ids)) return e.tag_ids;
-		return [];
+	// Return full Tag objects from the expense (what the backend returns)
+	function getExpenseTags(e: Expense): Tag[] {
+		return Array.isArray(e.tags) ? e.tags : [];
 	}
 
 	async function fetchExpenses() {
@@ -46,7 +53,7 @@
 			if (filterPm !== '') filters.payment_method_id = filterPm;
 
 			const paginatedResult = await expensesApi.list(filters);
-			
+
 			if (paginatedResult) {
 				expenses = paginatedResult.expenses || [];
 				totalCount = paginatedResult.total_count || 0;
@@ -92,14 +99,9 @@
 
 	onMount(async () => {
 		try {
-			const [c, p, t] = await Promise.all([
-				categoriesApi.list(),
-				paymentMethodsApi.list(),
-				tagsApi.list()
-			]);
+			const [c, p] = await Promise.all([categoriesApi.list(), paymentMethodsApi.list()]);
 			categories = c ?? [];
 			paymentMethods = p ?? [];
-			tags = t ?? [];
 
 			await fetchExpenses();
 		} catch (err: unknown) {
@@ -131,7 +133,7 @@
 					<option value={c.category_id}>{c.category_name}</option>
 				{/each}
 			</select>
-			
+
 			<select bind:value={filterPm} onchange={applyFilters}>
 				<option value="">All Payment Methods</option>
 				{#each paymentMethods as p (p.payment_method_id)}
@@ -139,7 +141,7 @@
 				{/each}
 			</select>
 		</div>
-		
+
 		<div class="filter-group">
 			<span class="muted small" style="margin-right: 0.5rem">Show:</span>
 			<select bind:value={filterLimit} onchange={applyFilters} style="width: auto;">
@@ -165,7 +167,10 @@
 				<p>No expenses found.</p>
 			</div>
 		{:else}
-			<div class="table-container" style="border-bottom-left-radius: 0; border-bottom-right-radius: 0;">
+			<div
+				class="table-container"
+				style="border-bottom-left-radius: 0; border-bottom-right-radius: 0;"
+			>
 				<table>
 					<thead>
 						<tr>
@@ -183,7 +188,9 @@
 							<tr>
 								<td>{formatDate(e.expense_date)}</td>
 								<td>
-									<a href={resolve(`/expenses/${e.expense_id}`)}>{e.merchant_name ?? `#${e.expense_id}`}</a>
+									<a href={resolve(`/expenses/${e.expense_id}`)}
+										>{e.merchant_name ?? `#${e.expense_id}`}</a
+									>
 									{#if e.description}
 										<div class="muted small">{e.description}</div>
 									{/if}
@@ -191,14 +198,12 @@
 								<td>{categoryById.get(e.category_id)?.category_name ?? '—'}</td>
 								<td>{pmById.get(e.payment_method_id)?.method_name ?? '—'}</td>
 								<td>
-									{#each expenseTagIds(e) as tid (tid)}
-										{@const tag = tagById.get(tid)}
-										{#if tag}
-											<span class="badge">
-												{#if tag.color}<span class="color-dot" style:background={tag.color}></span>{/if}
-												{tag.tag_name}
-											</span>
-										{/if}
+									{#each getExpenseTags(e) as tag (tag.tag_id)}
+										<span class="badge">
+											{#if tag.color}<span class="color-dot" style:background={tag.color}
+												></span>{/if}
+											{tag.tag_name}
+										</span>
 									{/each}
 								</td>
 								<td style="text-align:right">{formatAmount(e.amount, e.currency)}</td>
@@ -217,7 +222,7 @@
 					</tbody>
 				</table>
 			</div>
-			
+
 			<div class="pagination">
 				<div class="page-info">
 					Showing {offset + 1} to {Math.min(offset + filterLimit, totalCount)} of {totalCount} records
@@ -227,7 +232,11 @@
 						<ChevronLeft size={16} /> Prev
 					</button>
 					<span class="page-count">Page {currentPage} of {totalPages}</span>
-					<button class="secondary" disabled={offset + filterLimit >= totalCount} onclick={nextPage}>
+					<button
+						class="secondary"
+						disabled={offset + filterLimit >= totalCount}
+						onclick={nextPage}
+					>
 						Next <ChevronRight size={16} />
 					</button>
 				</div>
@@ -302,7 +311,7 @@
 		font-weight: 500;
 		color: var(--text);
 	}
-	
+
 	.page-controls button {
 		display: flex;
 		align-items: center;

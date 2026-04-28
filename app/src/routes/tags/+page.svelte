@@ -82,8 +82,12 @@
 						</td>
 						<td>
 							<div class="actions">
-								<a href={resolve(`/tags/${t.tag_id}`)}><button title="Edit"><Pencil size={15} /></button></a>
-								<button class="danger" title="Delete" onclick={() => remove(t.tag_id, t.tag_name)}><Trash2 size={15} /></button>
+								<a href={resolve(`/tags/${t.tag_id}`)}
+									><button title="Edit"><Pencil size={15} /></button></a
+								>
+								<button class="danger" title="Delete" onclick={() => remove(t.tag_id, t.tag_name)}
+									><Trash2 size={15} /></button
+								>
 							</div>
 						</td>
 					</tr>

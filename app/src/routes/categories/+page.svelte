@@ -46,7 +46,9 @@
 <div class="page">
 	<div class="page-header">
 		<h1><FolderTree size={22} /> Categories</h1>
-		<a href={resolve('/categories/new')}><button class="primary"><Plus size={16} /> New category</button></a>
+		<a href={resolve('/categories/new')}
+			><button class="primary"><Plus size={16} /> New category</button></a
+		>
 	</div>
 
 	{#if error}
@@ -89,8 +91,15 @@
 						</td>
 						<td>
 							<div class="actions">
-								<a href={resolve(`/categories/${c.category_id}`)}><button title="Edit"><Pencil size={15} /></button></a>
-								<button class="danger" title="Delete" onclick={() => remove(c.category_id, c.category_name)}><Trash2 size={15} /></button>
+								<a href={resolve(`/categories/${c.category_id}`)}
+									><button title="Edit"><Pencil size={15} /></button></a
+								>
+								<button
+									class="danger"
+									title="Delete"
+									onclick={() => remove(c.category_id, c.category_name)}
+									><Trash2 size={15} /></button
+								>
 							</div>
 						</td>
 					</tr>

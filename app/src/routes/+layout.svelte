@@ -7,12 +7,12 @@
 	let { children } = $props();
 
 	const navItems = [
-        { href: '/' as const, label: 'Dashboard', icon: LayoutDashboard, exact: true },
-        { href: '/expenses' as const, label: 'Expenses', icon: Receipt },
-        { href: '/categories' as const, label: 'Categories', icon: FolderTree },
-        { href: '/tags' as const, label: 'Tags', icon: Tags },
-        { href: '/payment-methods' as const, label: 'Payment methods', icon: CreditCard }
-    ];
+		{ href: '/' as const, label: 'Dashboard', icon: LayoutDashboard, exact: true },
+		{ href: '/expenses' as const, label: 'Expenses', icon: Receipt },
+		{ href: '/categories' as const, label: 'Categories', icon: FolderTree },
+		{ href: '/tags' as const, label: 'Tags', icon: Tags },
+		{ href: '/payment-methods' as const, label: 'Payment methods', icon: CreditCard }
+	];
 
 	function isActive(href: string, exact = false): boolean {
 		const path = page.url.pathname;
@@ -34,7 +34,11 @@
 		<nav>
 			{#each navItems as item (item.href)}
 				{@const ItemIcon = item.icon}
-				<a href={resolve(item.href)} class="nav-item" class:active={isActive(item.href, item.exact)}>
+				<a
+					href={resolve(item.href)}
+					class="nav-item"
+					class:active={isActive(item.href, item.exact)}
+				>
 					<ItemIcon size={18} />
 					<span>{item.label}</span>
 				</a>

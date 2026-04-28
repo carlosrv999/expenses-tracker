@@ -41,7 +41,9 @@
 <div class="page">
 	<div class="page-header">
 		<h1><CreditCard size={22} /> Payment methods</h1>
-		<a href={resolve('/payment-methods/new')}><button class="primary"><Plus size={16} /> New method</button></a>
+		<a href={resolve('/payment-methods/new')}
+			><button class="primary"><Plus size={16} /> New method</button></a
+		>
 	</div>
 
 	{#if error}
@@ -75,8 +77,15 @@
 						<td><span class="badge">{m.method_type}</span></td>
 						<td>
 							<div class="actions">
-								<a href={resolve(`/payment-methods/${m.payment_method_id}`)}><button title="Edit"><Pencil size={15} /></button></a>
-								<button class="danger" title="Delete" onclick={() => remove(m.payment_method_id, m.method_name)}><Trash2 size={15} /></button>
+								<a href={resolve(`/payment-methods/${m.payment_method_id}`)}
+									><button title="Edit"><Pencil size={15} /></button></a
+								>
+								<button
+									class="danger"
+									title="Delete"
+									onclick={() => remove(m.payment_method_id, m.method_name)}
+									><Trash2 size={15} /></button
+								>
 							</div>
 						</td>
 					</tr>

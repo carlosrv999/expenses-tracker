@@ -28,5 +28,9 @@
 	{#if error}
 		<div class="error">{error}</div>
 	{/if}
-	<PaymentMethodForm onSubmit={handleSubmit} {submitting} cancelHref={resolve('/payment-methods')} />
+	<PaymentMethodForm
+		onSubmit={handleSubmit}
+		{submitting}
+		cancelHref={resolve('/payment-methods')}
+	/>
 </div>

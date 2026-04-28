@@ -114,7 +114,9 @@
 				<a href={resolve('/expenses')}>View all →</a>
 			</div>
 			{#if recent.length === 0}
-				<p class="empty">No expenses yet. <a href={resolve('/expenses/new')}>Create the first one</a>.</p>
+				<p class="empty">
+					No expenses yet. <a href={resolve('/expenses/new')}>Create the first one</a>.
+				</p>
 			{:else}
 				<table>
 					<thead>
