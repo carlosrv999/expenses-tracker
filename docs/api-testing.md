@@ -92,8 +92,11 @@ curl -s http://localhost:8080/api/v1/expenses | jq
 # Filter by category + limit
 curl -s "http://localhost:8080/api/v1/expenses?category_id=1&limit=10" | jq
 
-# Filter by payment method
+# Filter by payment method, limit and offset
 curl -s "http://localhost:8080/api/v1/expenses?payment_method_id=1&offset=0&limit=5" | jq
+
+# Filter start date and end date
+curl -s "http://localhost:8080/api/v1/expenses?start_date=2025-04-01&end_date=2025-04-30" | jq
 ```
 
 ### 2. Create a new expense

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"expenses/internal/model"
 )
@@ -21,6 +22,8 @@ func NewExpenseRepository(db *sql.DB) *ExpenseRepository {
 type ExpenseFilter struct {
 	CategoryID      *int64
 	PaymentMethodID *int64
+	StartDate       *time.Time
+	EndDate         *time.Time
 	IncludeDeleted  bool
 	Limit           int
 	Offset          int
@@ -86,6 +89,14 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 	if f.PaymentMethodID != nil {
 		args = append(args, *f.PaymentMethodID)
 		conds = append(conds, fmt.Sprintf("payment_method_id = $%d", len(args)))
+	}
+	if f.StartDate != nil {
+		args = append(args, *f.StartDate)
+		conds = append(conds, fmt.Sprintf("expense_date >= $%d", len(args)))
+	}
+	if f.EndDate != nil {
+		args = append(args, *f.EndDate)
+		conds = append(conds, fmt.Sprintf("expense_date <= $%d", len(args)))
 	}
 
 	where := ""
@@ -157,6 +168,15 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 	if f.PaymentMethodID != nil {
 		args = append(args, *f.PaymentMethodID)
 		conds = append(conds, fmt.Sprintf("payment_method_id = $%d", len(args)))
+	}
+
+	if f.StartDate != nil {
+		args = append(args, *f.StartDate)
+		conds = append(conds, fmt.Sprintf("expense_date >= $%d", len(args)))
+	}
+	if f.EndDate != nil {
+		args = append(args, *f.EndDate)
+		conds = append(conds, fmt.Sprintf("expense_date <= $%d", len(args)))
 	}
 
 	where := ""

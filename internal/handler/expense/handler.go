@@ -145,6 +145,26 @@ func parseFilter(c *echo.Context) (repository.ExpenseFilter, error) {
 		}
 		f.PaymentMethodID = &id
 	}
+
+	// === NEW: Date range filters ===
+	if v := c.QueryParam("start_date"); v != "" {
+		t, err := parseDate(v)
+		if err != nil {
+			return f, echo.NewHTTPError(http.StatusBadRequest, "invalid start_date. Use format YYYY-MM-DD (or RFC3339)")
+		}
+		f.StartDate = &t
+	}
+	if v := c.QueryParam("end_date"); v != "" {
+		t, err := parseDate(v)
+		if err != nil {
+			return f, echo.NewHTTPError(http.StatusBadRequest, "invalid end_date. Use format YYYY-MM-DD (or RFC3339)")
+		}
+		// Make end_date inclusive of the entire day (critical for date-only inputs)
+		year, month, day := t.Date()
+		endOfDay := time.Date(year, month, day, 23, 59, 59, 999999999, t.Location())
+		f.EndDate = &endOfDay
+	}
+
 	if v := c.QueryParam("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
