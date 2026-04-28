@@ -1,9 +1,14 @@
 package expense
 
 import (
+	"encoding/csv"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -27,6 +32,9 @@ func (h *Handler) Register(g *echo.Group) {
 	g.GET("/:id", h.get)
 	g.PUT("/:id", h.update)
 	g.DELETE("/:id", h.delete)
+
+	// ✅ NEW: CSV bulk upload
+	g.POST("/upload", h.uploadCSV)
 }
 
 func (h *Handler) list(c *echo.Context) error {
@@ -156,4 +164,149 @@ func mapServiceError(err error) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return handler.MapError(err)
+}
+
+// Upload CSV file
+func (h *Handler) uploadCSV(c *echo.Context) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "file is required (field name: 'file')")
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "cannot open file")
+	}
+	defer src.Close()
+
+	expenses, tagIDsList, err := parseExpenseCSV(src)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("CSV parsing error: %v", err))
+	}
+
+	if len(expenses) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "CSV file is empty")
+	}
+
+	if err := h.svc.BulkCreate(c.Request().Context(), expenses, tagIDsList); err != nil {
+		return mapServiceError(err) // reuses your existing error mapper
+	}
+
+	return c.JSON(http.StatusCreated, map[string]any{
+		"message":  "expenses uploaded successfully",
+		"uploaded": len(expenses),
+	})
+}
+
+// parseExpenseCSV reads the CSV and returns expenses + their tags
+func parseExpenseCSV(r io.Reader) ([]*model.Expense, [][]int64, error) {
+	reader := csv.NewReader(r)
+	reader.FieldsPerRecord = -1 // allow variable number of columns
+	reader.TrimLeadingSpace = true
+
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid CSV: %w", err)
+	}
+	if len(records) < 2 {
+		return nil, nil, errors.New("CSV must have header + at least one data row")
+	}
+
+	var expenses []*model.Expense
+	var tagIDsList [][]int64
+
+	for i := 1; i < len(records); i++ { // skip header
+		row := records[i]
+		if len(row) < 4 {
+			return nil, nil, fmt.Errorf("row %d: not enough columns (need at least expense_date,amount,category_id,payment_method_id)", i)
+		}
+
+		expenseDate, err := parseDate(row[0])
+		if err != nil {
+			return nil, nil, fmt.Errorf("row %d: %w", i, err)
+		}
+
+		amount, err := strconv.ParseInt(strings.TrimSpace(row[1]), 10, 64)
+		if err != nil || amount <= 0 {
+			return nil, nil, fmt.Errorf("row %d: invalid amount", i)
+		}
+
+		categoryID, _ := strconv.ParseInt(strings.TrimSpace(row[2]), 10, 64)
+		paymentMethodID, _ := strconv.ParseInt(strings.TrimSpace(row[3]), 10, 64)
+
+		currency := "PEN"
+		if len(row) > 4 && strings.TrimSpace(row[4]) != "" {
+			currency = strings.TrimSpace(row[4])
+		}
+
+		var merchantName *string
+		if len(row) > 5 && strings.TrimSpace(row[5]) != "" {
+			s := strings.TrimSpace(row[5])
+			merchantName = &s
+		}
+
+		var description *string
+		if len(row) > 6 && strings.TrimSpace(row[6]) != "" {
+			s := strings.TrimSpace(row[6])
+			description = &s
+		}
+
+		var tagIDs []int64
+		if len(row) > 7 {
+			tagIDs, err = parseTagIDs(row[7])
+			if err != nil {
+				return nil, nil, fmt.Errorf("row %d: %w", i, err)
+			}
+		}
+
+		e := &model.Expense{
+			CategoryID:      categoryID,
+			PaymentMethodID: paymentMethodID,
+			Currency:        currency,
+			Amount:          amount,
+			ExpenseDate:     expenseDate,
+			MerchantName:    merchantName,
+			Description:     description,
+		}
+
+		expenses = append(expenses, e)
+		tagIDsList = append(tagIDsList, tagIDs)
+	}
+
+	return expenses, tagIDsList, nil
+}
+
+func parseDate(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, errors.New("expense_date is required")
+	}
+	layouts := []string{time.DateOnly, time.RFC3339, "2006-01-02 15:04:05"}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid date format: %s (use YYYY-MM-DD)", s)
+}
+
+func parseTagIDs(s string) ([]int64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	parts := strings.Split(s, ",")
+	ids := make([]int64, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(p, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid tag_id '%s'", p)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

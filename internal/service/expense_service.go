@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"expenses/internal/model"
 	"expenses/internal/repository"
@@ -11,6 +12,7 @@ import (
 var (
 	ErrInvalidAmount   = errors.New("amount must be positive")
 	ErrInvalidCurrency = errors.New("currency must be a 3-letter ISO 4217 code")
+	ErrMismatchedLists = errors.New("internal error: expenses and tag lists length mismatch")
 )
 
 type ExpenseService struct {
@@ -87,4 +89,18 @@ func validateExpense(e *model.Expense) error {
 		return ErrInvalidCurrency
 	}
 	return nil
+}
+
+func (s *ExpenseService) BulkCreate(ctx context.Context, expenses []*model.Expense, tagIDsList [][]int64) error {
+	if len(expenses) != len(tagIDsList) {
+		return ErrMismatchedLists
+	}
+
+	for i, e := range expenses {
+		if err := validateExpense(e); err != nil {
+			return fmt.Errorf("row %d: %w", i, err)
+		}
+	}
+
+	return s.expenses.BulkCreate(ctx, expenses, tagIDsList)
 }

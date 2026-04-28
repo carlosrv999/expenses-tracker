@@ -206,3 +206,30 @@ func setExpenseTagsTx(ctx context.Context, tx *sql.Tx, expenseID int64, tagIDs [
 	_, err := tx.ExecContext(ctx, q, args...)
 	return err
 }
+
+func (r *ExpenseRepository) BulkCreate(ctx context.Context, expenses []*model.Expense, tagIDsList [][]int64) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	const insert = `
+		INSERT INTO expense (category_id, payment_method_id, currency, amount, expense_date, merchant_name, description)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING expense_id, created_at, updated_at`
+
+	for i, e := range expenses {
+		if err := tx.QueryRowContext(ctx, insert,
+			e.CategoryID, e.PaymentMethodID, e.Currency, e.Amount, e.ExpenseDate, e.MerchantName, e.Description,
+		).Scan(&e.ExpenseID, &e.CreatedAt, &e.UpdatedAt); err != nil {
+			return fmt.Errorf("failed to insert expense %d: %w", i, err)
+		}
+
+		if err := setExpenseTagsTx(ctx, tx, e.ExpenseID, tagIDsList[i]); err != nil {
+			return fmt.Errorf("failed to set tags for expense %d: %w", i, err)
+		}
+	}
+
+	return tx.Commit()
+}
