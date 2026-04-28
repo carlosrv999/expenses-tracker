@@ -8,6 +8,7 @@
 	import { resolve } from '$app/paths';
 
 	let expenses: Expense[] = $state([]);
+	let totalExpenses = $state(0); // ← NEW: real total from backend
 	let categories: Category[] = $state([]);
 	let tags: Tag[] = $state([]);
 	let paymentMethods: PaymentMethod[] = $state([]);
@@ -30,13 +31,14 @@
 	onMount(async () => {
 		try {
 			const [paginated, c, t, p] = await Promise.all([
-				expensesApi.list({ limit: 100 }), // now returns PaginatedExpenseList
+				expensesApi.list({ limit: 100 }), // still limited for "Recent expenses"
 				categoriesApi.list(),
 				tagsApi.list(),
 				paymentMethodsApi.list()
 			]);
-			// Extract only the expenses array from the paginated response
+
 			expenses = paginated?.expenses ?? [];
+			totalExpenses = paginated?.total_count ?? 0; // ← THIS IS THE FIX
 			categories = c ?? [];
 			tags = t ?? [];
 			paymentMethods = p ?? [];
@@ -68,7 +70,7 @@
 				<div class="stat-icon"><Receipt size={20} /></div>
 				<div>
 					<div class="stat-label">Expenses</div>
-					<div class="stat-value">{expenses.length}</div>
+					<div class="stat-value">{totalExpenses}</div>
 				</div>
 			</a>
 			<a href={resolve('/categories')} class="stat card">

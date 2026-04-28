@@ -83,6 +83,8 @@ export interface ExpenseInput {
 export interface ExpenseListFilters {
 	category_id?: number;
 	payment_method_id?: number;
+	start_date?: string;
+	end_date?: string;
 	limit?: number;
 	offset?: number;
 }

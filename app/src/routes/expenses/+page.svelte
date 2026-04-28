@@ -8,7 +8,7 @@
 		Pencil,
 		Trash2,
 		Plus,
-		Filter,
+		Funnel,
 		Upload,
 		ChevronLeft,
 		ChevronRight
@@ -27,6 +27,8 @@
 	// Filter & Pagination States
 	let filterCategory = $state<number | ''>('');
 	let filterPm = $state<number | ''>('');
+	let filterStartDate = $state<string>(''); // ← NEW
+	let filterEndDate = $state<string>(''); // ← NEW
 	let filterLimit = $state<number>(20);
 	let offset = $state<number>(0);
 
@@ -51,6 +53,8 @@
 			};
 			if (filterCategory !== '') filters.category_id = filterCategory;
 			if (filterPm !== '') filters.payment_method_id = filterPm;
+			if (filterStartDate) filters.start_date = filterStartDate; // ← NEW
+			if (filterEndDate) filters.end_date = filterEndDate; // ← NEW
 
 			const paginatedResult = await expensesApi.list(filters);
 
@@ -125,30 +129,57 @@
 	</div>
 
 	<div class="filters card">
-		<div class="filter-group">
-			<Filter size={16} />
-			<select bind:value={filterCategory} onchange={applyFilters}>
-				<option value="">All Categories</option>
-				{#each categories as c (c.category_id)}
-					<option value={c.category_id}>{c.category_name}</option>
-				{/each}
-			</select>
+		<div class="filter-bar">
+			<!-- Left filters -->
+			<div class="filter-group main-filters">
+				<Funnel size={16} style="opacity: 0.6; flex-shrink: 0;" />
 
-			<select bind:value={filterPm} onchange={applyFilters}>
-				<option value="">All Payment Methods</option>
-				{#each paymentMethods as p (p.payment_method_id)}
-					<option value={p.payment_method_id}>{p.method_name}</option>
-				{/each}
-			</select>
-		</div>
+				<select bind:value={filterCategory} onchange={applyFilters} class="filter-select">
+					<option value="">All Categories</option>
+					{#each categories as c (c.category_id)}
+						<option value={c.category_id}>{c.category_name}</option>
+					{/each}
+				</select>
 
-		<div class="filter-group">
-			<span class="muted small" style="margin-right: 0.5rem">Show:</span>
-			<select bind:value={filterLimit} onchange={applyFilters} style="width: auto;">
-				<option value={20}>20</option>
-				<option value={50}>50</option>
-				<option value={100}>100</option>
-			</select>
+				<select bind:value={filterPm} onchange={applyFilters} class="filter-select">
+					<option value="">All Payment Methods</option>
+					{#each paymentMethods as p (p.payment_method_id)}
+						<option value={p.payment_method_id}>{p.method_name}</option>
+					{/each}
+				</select>
+			</div>
+
+			<!-- Date range -->
+			<div class="date-range">
+				<div class="date-field">
+					<label for="start-date" class="date-label">Desde</label>
+					<input
+						type="date"
+						bind:value={filterStartDate}
+						onchange={applyFilters}
+						class="date-input"
+					/>
+				</div>
+				<div class="date-field">
+					<label for="end-date" class="date-label">Hasta</label>
+					<input
+						type="date"
+						bind:value={filterEndDate}
+						onchange={applyFilters}
+						class="date-input"
+					/>
+				</div>
+			</div>
+
+			<!-- Show selector (pushed to the right) -->
+			<div class="filter-group show-group">
+				<span class="muted small">Show:</span>
+				<select bind:value={filterLimit} onchange={applyFilters} class="filter-select">
+					<option value={20}>20</option>
+					<option value={50}>50</option>
+					<option value={100}>100</option>
+				</select>
+			</div>
 		</div>
 	</div>
 
@@ -248,11 +279,13 @@
 <style>
 	/* Keep all your existing styles – they are already excellent */
 	.filters {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 1rem;
 		margin-bottom: 1.5rem;
+	}
+
+	.filter-bar {
+		display: flex;
+		align-items: flex-end;
+		gap: 1.25rem;
 		flex-wrap: wrap;
 	}
 
@@ -269,6 +302,21 @@
 		background: var(--surface-2);
 		color: var(--text);
 		font-size: 0.9rem;
+	}
+
+	.main-filters {
+		gap: 0.75rem;
+	}
+
+	.filter-select {
+		padding: 0.45rem 0.85rem;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		color: var(--text);
+		font-size: 0.95rem;
+		min-width: 80px;
+		height: 42px;
 	}
 
 	.table-container {
@@ -316,5 +364,54 @@
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
+	}
+
+	.date-range {
+		display: flex;
+		align-items: flex-end;
+		gap: 1rem;
+	}
+
+	.date-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.date-label {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		white-space: nowrap;
+		margin-bottom: 2px;
+	}
+
+	.date-input {
+		padding: 0.45rem 0.85rem;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		color: var(--text);
+		font-size: 0.95rem;
+		width: 160px;
+		height: 42px;
+	}
+
+	.show-group {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	/* Responsive: stack on very small screens */
+	@media (max-width: 640px) {
+		.filter-bar {
+			flex-direction: column;
+			align-items: stretch;
+		}
+		.show-group {
+			margin-left: 0;
+			justify-content: flex-end;
+		}
 	}
 </style>
