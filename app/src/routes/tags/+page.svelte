@@ -5,6 +5,7 @@
 	import IconBadge from '$lib/components/IconBadge.svelte';
 	import { Tag as TagIcon, Pencil, Trash2, Plus, Tags } from 'lucide-svelte';
 	import type { IconComponent } from '$lib/icons';
+	import { resolve } from '$app/paths';
 
 	const tagFallback = TagIcon as unknown as IconComponent;
 
@@ -40,7 +41,7 @@
 <div class="page">
 	<div class="page-header">
 		<h1><Tags size={22} /> Tags</h1>
-		<a href="/tags/new"><button class="primary"><Plus size={16} /> New tag</button></a>
+		<a href={resolve('/tags/new')}><button class="primary"><Plus size={16} /> New tag</button></a>
 	</div>
 
 	{#if error}
@@ -51,7 +52,7 @@
 		<p class="muted">Loading…</p>
 	{:else if tags.length === 0}
 		<div class="empty card">
-			No tags yet. <a href="/tags/new">Create the first one</a>.
+			No tags yet. <a href={resolve('/tags/new')}>Create the first one</a>.
 		</div>
 	{:else}
 		<table>
@@ -68,7 +69,7 @@
 						<td>
 							<span class="icon-cell">
 								<IconBadge name={t.icon} fallback={tagFallback} color={t.color} />
-								<a href={`/tags/${t.tag_id}`}>{t.tag_name}</a>
+								<a href={resolve(`/tags/${t.tag_id}`)}>{t.tag_name}</a>
 							</span>
 						</td>
 						<td>
@@ -81,7 +82,7 @@
 						</td>
 						<td>
 							<div class="actions">
-								<a href={`/tags/${t.tag_id}`}><button title="Edit"><Pencil size={15} /></button></a>
+								<a href={resolve(`/tags/${t.tag_id}`)}><button title="Edit"><Pencil size={15} /></button></a>
 								<button class="danger" title="Delete" onclick={() => remove(t.tag_id, t.tag_name)}><Trash2 size={15} /></button>
 							</div>
 						</td>

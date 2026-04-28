@@ -3,6 +3,7 @@
 	import { tagsApi } from '$lib/api';
 	import TagForm from '$lib/components/TagForm.svelte';
 	import type { TagInput } from '$lib/types';
+	import { resolve } from '$app/paths';
 
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
@@ -12,7 +13,7 @@
 		error = null;
 		try {
 			await tagsApi.create(input);
-			await goto('/tags');
+			await goto(resolve('/tags'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 			submitting = false;
@@ -27,5 +28,5 @@
 	{#if error}
 		<div class="error">{error}</div>
 	{/if}
-	<TagForm onSubmit={handleSubmit} {submitting} cancelHref="/tags" />
+	<TagForm onSubmit={handleSubmit} {submitting} cancelHref={resolve('/tags')} />
 </div>

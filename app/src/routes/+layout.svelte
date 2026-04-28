@@ -2,16 +2,17 @@
 	import '$lib/styles.css';
 	import { page } from '$app/state';
 	import { Wallet, FolderTree, Tags, CreditCard, Receipt, LayoutDashboard } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
 
 	let { children } = $props();
 
 	const navItems = [
-		{ href: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-		{ href: '/expenses', label: 'Expenses', icon: Receipt },
-		{ href: '/categories', label: 'Categories', icon: FolderTree },
-		{ href: '/tags', label: 'Tags', icon: Tags },
-		{ href: '/payment-methods', label: 'Payment methods', icon: CreditCard }
-	];
+        { href: '/' as const, label: 'Dashboard', icon: LayoutDashboard, exact: true },
+        { href: '/expenses' as const, label: 'Expenses', icon: Receipt },
+        { href: '/categories' as const, label: 'Categories', icon: FolderTree },
+        { href: '/tags' as const, label: 'Tags', icon: Tags },
+        { href: '/payment-methods' as const, label: 'Payment methods', icon: CreditCard }
+    ];
 
 	function isActive(href: string, exact = false): boolean {
 		const path = page.url.pathname;
@@ -33,7 +34,7 @@
 		<nav>
 			{#each navItems as item (item.href)}
 				{@const ItemIcon = item.icon}
-				<a href={item.href} class="nav-item" class:active={isActive(item.href, item.exact)}>
+				<a href={resolve(item.href)} class="nav-item" class:active={isActive(item.href, item.exact)}>
 					<ItemIcon size={18} />
 					<span>{item.label}</span>
 				</a>

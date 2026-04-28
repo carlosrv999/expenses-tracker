@@ -4,6 +4,8 @@
 	import { formatAmount, formatDate } from '$lib/format';
 	import type { Category, Expense, PaymentMethod, Tag } from '$lib/types';
 	import { Receipt, FolderTree, Tags as TagsIcon, CreditCard, Plus } from 'lucide-svelte';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { resolve } from '$app/paths';
 
 	let expenses: Expense[] = $state([]);
 	let categories: Category[] = $state([]);
@@ -16,7 +18,7 @@
 	let pmById = $derived(new Map(paymentMethods.map((p) => [p.payment_method_id, p])));
 
 	let totalByCurrency = $derived.by(() => {
-		const totals = new Map<string, number>();
+		const totals = new SvelteMap<string, number>();
 		for (const e of expenses) {
 			totals.set(e.currency, (totals.get(e.currency) ?? 0) + e.amount);
 		}
@@ -48,7 +50,7 @@
 <div class="page">
 	<div class="page-header">
 		<h1>Dashboard</h1>
-		<a class="primary-link" href="/expenses/new">
+		<a class="primary-link" href={resolve('/expenses/new')}>
 			<button class="primary"><Plus size={16} /> New expense</button>
 		</a>
 	</div>
@@ -61,28 +63,28 @@
 		<p class="muted">Loading…</p>
 	{:else}
 		<div class="stats">
-			<a href="/expenses" class="stat card">
+			<a href={resolve('/expenses')} class="stat card">
 				<div class="stat-icon"><Receipt size={20} /></div>
 				<div>
 					<div class="stat-label">Expenses</div>
 					<div class="stat-value">{expenses.length}</div>
 				</div>
 			</a>
-			<a href="/categories" class="stat card">
+			<a href={resolve('/categories')} class="stat card">
 				<div class="stat-icon"><FolderTree size={20} /></div>
 				<div>
 					<div class="stat-label">Categories</div>
 					<div class="stat-value">{categories.length}</div>
 				</div>
 			</a>
-			<a href="/tags" class="stat card">
+			<a href={resolve('/tags')} class="stat card">
 				<div class="stat-icon"><TagsIcon size={20} /></div>
 				<div>
 					<div class="stat-label">Tags</div>
 					<div class="stat-value">{tags.length}</div>
 				</div>
 			</a>
-			<a href="/payment-methods" class="stat card">
+			<a href={resolve('/payment-methods')} class="stat card">
 				<div class="stat-icon"><CreditCard size={20} /></div>
 				<div>
 					<div class="stat-label">Payment methods</div>
@@ -108,10 +110,10 @@
 		<div class="card">
 			<div class="recent-header">
 				<h2>Recent expenses</h2>
-				<a href="/expenses">View all →</a>
+				<a href={resolve('/expenses')}>View all →</a>
 			</div>
 			{#if recent.length === 0}
-				<p class="empty">No expenses yet. <a href="/expenses/new">Create the first one</a>.</p>
+				<p class="empty">No expenses yet. <a href={resolve('/expenses/new')}>Create the first one</a>.</p>
 			{:else}
 				<table>
 					<thead>

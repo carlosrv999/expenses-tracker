@@ -5,6 +5,7 @@
 	import IconBadge from '$lib/components/IconBadge.svelte';
 	import { Folder, FolderTree, Pencil, Trash2, Plus } from 'lucide-svelte';
 	import type { IconComponent } from '$lib/icons';
+	import { resolve } from '$app/paths';
 
 	const folderIcon = Folder as unknown as IconComponent;
 
@@ -45,7 +46,7 @@
 <div class="page">
 	<div class="page-header">
 		<h1><FolderTree size={22} /> Categories</h1>
-		<a href="/categories/new"><button class="primary"><Plus size={16} /> New category</button></a>
+		<a href={resolve('/categories/new')}><button class="primary"><Plus size={16} /> New category</button></a>
 	</div>
 
 	{#if error}
@@ -56,7 +57,7 @@
 		<p class="muted">Loading…</p>
 	{:else if categories.length === 0}
 		<div class="empty card">
-			No categories yet. <a href="/categories/new">Create the first one</a>.
+			No categories yet. <a href={resolve('/categories/new')}>Create the first one</a>.
 		</div>
 	{:else}
 		<table>
@@ -74,7 +75,7 @@
 						<td>
 							<span class="icon-cell">
 								<IconBadge name={c.icon} fallback={folderIcon} color={c.color} />
-								<a href={`/categories/${c.category_id}`}>{c.category_name}</a>
+								<a href={resolve(`/categories/${c.category_id}`)}>{c.category_name}</a>
 							</span>
 						</td>
 						<td>{parentName(c.parent_category_id) ?? '—'}</td>
@@ -88,7 +89,7 @@
 						</td>
 						<td>
 							<div class="actions">
-								<a href={`/categories/${c.category_id}`}><button title="Edit"><Pencil size={15} /></button></a>
+								<a href={resolve(`/categories/${c.category_id}`)}><button title="Edit"><Pencil size={15} /></button></a>
 								<button class="danger" title="Delete" onclick={() => remove(c.category_id, c.category_name)}><Trash2 size={15} /></button>
 							</div>
 						</td>

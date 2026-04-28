@@ -6,6 +6,7 @@
 	import ExpenseForm from '$lib/components/ExpenseForm.svelte';
 	import type { Category, Expense, ExpenseInput, PaymentMethod, Tag } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
 
 	let id = $derived(Number(page.params.id));
 	let expense = $state<Expense | null>(null);
@@ -40,7 +41,7 @@
 		error = null;
 		try {
 			await expensesApi.update(id, input);
-			await goto('/expenses');
+			await goto(resolve('/expenses'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 			submitting = false;
@@ -52,7 +53,7 @@
 		if (!confirm(`Delete expense #${expense.expense_id}?`)) return;
 		try {
 			await expensesApi.remove(id);
-			await goto('/expenses');
+			await goto(resolve('/expenses'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -79,7 +80,7 @@
 			{tags}
 			onSubmit={handleSubmit}
 			{submitting}
-			cancelHref="/expenses"
+			cancelHref={resolve('/expenses')}
 		/>
 	{:else}
 		<p class="muted">Expense not found.</p>

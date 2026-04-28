@@ -5,6 +5,7 @@
 	import IconBadge from '$lib/components/IconBadge.svelte';
 	import { CreditCard, Pencil, Trash2, Plus } from 'lucide-svelte';
 	import type { IconComponent } from '$lib/icons';
+	import { resolve } from '$app/paths';
 
 	const ccFallback = CreditCard as unknown as IconComponent;
 
@@ -40,7 +41,7 @@
 <div class="page">
 	<div class="page-header">
 		<h1><CreditCard size={22} /> Payment methods</h1>
-		<a href="/payment-methods/new"><button class="primary"><Plus size={16} /> New method</button></a>
+		<a href={resolve('/payment-methods/new')}><button class="primary"><Plus size={16} /> New method</button></a>
 	</div>
 
 	{#if error}
@@ -51,7 +52,7 @@
 		<p class="muted">Loading…</p>
 	{:else if methods.length === 0}
 		<div class="empty card">
-			No payment methods yet. <a href="/payment-methods/new">Create the first one</a>.
+			No payment methods yet. <a href={resolve('/payment-methods/new')}>Create the first one</a>.
 		</div>
 	{:else}
 		<table>
@@ -68,13 +69,13 @@
 						<td>
 							<span class="icon-cell">
 								<IconBadge name={m.icon} fallback={ccFallback} />
-								<a href={`/payment-methods/${m.payment_method_id}`}>{m.method_name}</a>
+								<a href={resolve(`/payment-methods/${m.payment_method_id}`)}>{m.method_name}</a>
 							</span>
 						</td>
 						<td><span class="badge">{m.method_type}</span></td>
 						<td>
 							<div class="actions">
-								<a href={`/payment-methods/${m.payment_method_id}`}><button title="Edit"><Pencil size={15} /></button></a>
+								<a href={resolve(`/payment-methods/${m.payment_method_id}`)}><button title="Edit"><Pencil size={15} /></button></a>
 								<button class="danger" title="Delete" onclick={() => remove(m.payment_method_id, m.method_name)}><Trash2 size={15} /></button>
 							</div>
 						</td>

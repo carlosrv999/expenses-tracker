@@ -6,6 +6,7 @@
 	import TagForm from '$lib/components/TagForm.svelte';
 	import type { Tag, TagInput } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
 
 	let id = $derived(Number(page.params.id));
 	let tag = $state<Tag | null>(null);
@@ -28,7 +29,7 @@
 		error = null;
 		try {
 			await tagsApi.update(id, input);
-			await goto('/tags');
+			await goto(resolve('/tags'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 			submitting = false;
@@ -40,7 +41,7 @@
 		if (!confirm(`Delete tag "${tag.tag_name}"?`)) return;
 		try {
 			await tagsApi.remove(id);
-			await goto('/tags');
+			await goto(resolve('/tags'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -60,7 +61,7 @@
 	{#if loading}
 		<p class="muted">Loading…</p>
 	{:else if tag}
-		<TagForm initial={tag} onSubmit={handleSubmit} {submitting} cancelHref="/tags" />
+		<TagForm initial={tag} onSubmit={handleSubmit} {submitting} cancelHref={resolve('/tags')} />
 	{:else}
 		<p class="muted">Tag not found.</p>
 	{/if}

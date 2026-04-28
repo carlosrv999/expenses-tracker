@@ -8,7 +8,8 @@
 	} from '$lib/api';
 	import { formatAmount, formatDate } from '$lib/format';
 	import type { Category, Expense, ExpenseListFilters, PaymentMethod, Tag } from '$lib/types';
-	import { Receipt, Pencil, Trash2, Plus, Filter, X } from 'lucide-svelte';
+	import { Receipt, Pencil, Trash2, Plus, Filter, X, Upload } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
 
 	let expenses: Expense[] = $state([]);
 	let categories: Category[] = $state([]);
@@ -82,7 +83,10 @@
 <div class="page">
 	<div class="page-header">
 		<h1><Receipt size={22} /> Expenses</h1>
-		<a href="/expenses/new"><button class="primary"><Plus size={16} /> New expense</button></a>
+		<a href={resolve('/expenses/upload')}>
+			<button class="secondary"><Upload size={16} /> Bulk Upload CSV</button>
+		</a>
+		<a href={resolve('/expenses/new')}><button class="primary"><Plus size={16} /> New expense</button></a>
 	</div>
 
 	<div class="card filters">
@@ -124,7 +128,7 @@
 		<p class="muted">Loading…</p>
 	{:else if expenses.length === 0}
 		<div class="empty card">
-			No expenses match. <a href="/expenses/new">Create one</a>.
+			No expenses match. <a href={resolve('/expenses/new')}>Create one</a>.
 		</div>
 	{:else}
 		<table>
@@ -144,7 +148,7 @@
 					<tr>
 						<td>{formatDate(e.expense_date)}</td>
 						<td>
-							<a href={`/expenses/${e.expense_id}`}>{e.merchant_name ?? `#${e.expense_id}`}</a>
+							<a href={resolve(`/expenses/${e.expense_id}`)}>{e.merchant_name ?? `#${e.expense_id}`}</a>
 							{#if e.description}
 								<div class="muted small">{e.description}</div>
 							{/if}
@@ -165,7 +169,7 @@
 						<td style="text-align:right">{formatAmount(e.amount, e.currency)}</td>
 						<td>
 							<div class="actions">
-								<a href={`/expenses/${e.expense_id}`}><button title="Edit"><Pencil size={15} /></button></a>
+								<a href={resolve(`/expenses/${e.expense_id}`)}><button title="Edit"><Pencil size={15} /></button></a>
 								<button class="danger" title="Delete" onclick={() => remove(e)}><Trash2 size={15} /></button>
 							</div>
 						</td>

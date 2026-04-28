@@ -4,6 +4,7 @@
 	import { categoriesApi } from '$lib/api';
 	import CategoryForm from '$lib/components/CategoryForm.svelte';
 	import type { Category, CategoryInput } from '$lib/types';
+	import { resolve } from '$app/paths';
 
 	let categories: Category[] = $state([]);
 	let submitting = $state(false);
@@ -22,7 +23,7 @@
 		error = null;
 		try {
 			await categoriesApi.create(input);
-			await goto('/categories');
+			await goto(resolve('/categories'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 			submitting = false;
@@ -37,5 +38,5 @@
 	{#if error}
 		<div class="error">{error}</div>
 	{/if}
-	<CategoryForm {categories} onSubmit={handleSubmit} {submitting} cancelHref="/categories" />
+	<CategoryForm {categories} onSubmit={handleSubmit} {submitting} cancelHref={resolve('/categories')} />
 </div>

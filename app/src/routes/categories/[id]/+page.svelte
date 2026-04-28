@@ -6,6 +6,7 @@
 	import CategoryForm from '$lib/components/CategoryForm.svelte';
 	import type { Category, CategoryInput } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
 
 	let id = $derived(Number(page.params.id));
 	let category = $state<Category | null>(null);
@@ -31,7 +32,7 @@
 		error = null;
 		try {
 			await categoriesApi.update(id, input);
-			await goto('/categories');
+			await goto(resolve('/categories'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 			submitting = false;
@@ -43,7 +44,7 @@
 		if (!confirm(`Delete category "${category.category_name}"?`)) return;
 		try {
 			await categoriesApi.remove(id);
-			await goto('/categories');
+			await goto(resolve('/categories'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -68,7 +69,7 @@
 			{categories}
 			onSubmit={handleSubmit}
 			{submitting}
-			cancelHref="/categories"
+			cancelHref={resolve('/categories')}
 		/>
 	{:else}
 		<p class="muted">Category not found.</p>

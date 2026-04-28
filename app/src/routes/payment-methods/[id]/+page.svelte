@@ -6,6 +6,7 @@
 	import PaymentMethodForm from '$lib/components/PaymentMethodForm.svelte';
 	import type { PaymentMethod, PaymentMethodInput } from '$lib/types';
 	import { Trash2 } from 'lucide-svelte';
+	import { resolve } from '$app/paths';
 
 	let id = $derived(Number(page.params.id));
 	let method = $state<PaymentMethod | null>(null);
@@ -28,7 +29,7 @@
 		error = null;
 		try {
 			await paymentMethodsApi.update(id, input);
-			await goto('/payment-methods');
+			await goto(resolve('/payment-methods'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 			submitting = false;
@@ -40,7 +41,7 @@
 		if (!confirm(`Delete payment method "${method.method_name}"?`)) return;
 		try {
 			await paymentMethodsApi.remove(id);
-			await goto('/payment-methods');
+			await goto(resolve('/payment-methods'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
 		}
@@ -64,7 +65,7 @@
 			initial={method}
 			onSubmit={handleSubmit}
 			{submitting}
-			cancelHref="/payment-methods"
+			cancelHref={resolve('/payment-methods')}
 		/>
 	{:else}
 		<p class="muted">Payment method not found.</p>
