@@ -49,6 +49,7 @@
 
 	let selectedYear = $state<number | null>(null); // null = All
 	let selectedMonth = $state<number | null>(null); // null = All, 1–12 otherwise
+	let selectedTagIds = $state<Set<number>>(new Set()); // empty = no tag filter
 
 	// Month options depend on selected year
 	let monthOptions = $derived.by(() => {
@@ -92,7 +93,8 @@
 	/** Fetch all pages for the given filters (handles >500 expenses). */
 	async function fetchAllChartExpenses(
 		year: number | null,
-		month: number | null
+		month: number | null,
+		tagIds: number[]
 	): Promise<Expense[]> {
 		const dateRange = buildDateRange(year, month);
 		const PAGE = 500;
@@ -100,7 +102,12 @@
 		const all: Expense[] = [];
 
 		while (true) {
-			const page = await expensesApi.list({ ...dateRange, limit: PAGE, offset });
+			const page = await expensesApi.list({
+				...dateRange,
+				...(tagIds.length > 0 ? { tags: tagIds } : {}),
+				limit: PAGE,
+				offset
+			});
 			const rows = page?.expenses ?? [];
 			all.push(...rows);
 			const total = page?.total_count ?? 0;
@@ -110,17 +117,18 @@
 		return all;
 	}
 
-	// Re-fetch chart data whenever year or month changes.
+	// Re-fetch chart data whenever year, month, or tags change.
 	// Capture the values as local consts so the async closure uses the
 	// snapshot at the time the effect ran, not a later value.
 	$effect(() => {
 		const year = selectedYear;
 		const month = selectedYear === null ? null : selectedMonth;
+		const tagIds = [...selectedTagIds]; // snapshot the Set
 
 		chartLoading = true;
 		chartError = null;
 
-		fetchAllChartExpenses(year, month)
+		fetchAllChartExpenses(year, month, tagIds)
 			.then((rows) => {
 				chartExpenses = rows;
 			})
@@ -378,6 +386,28 @@
 				</div>
 			</div>
 
+			{#if tags.length > 0}
+				<div class="tag-filter-row">
+					{#each tags as tag (tag.tag_id)}
+						{@const active = selectedTagIds.has(tag.tag_id)}
+						<button
+							class="tag-pill"
+							class:tag-pill--active={active}
+							style="--tag-color: {tag.color ?? '#64748b'}"
+							onclick={() => {
+								const next = new Set(selectedTagIds);
+								if (active) next.delete(tag.tag_id);
+								else next.add(tag.tag_id);
+								selectedTagIds = next;
+							}}
+						>
+							<span class="tag-dot"></span>
+							{tag.tag_name}
+						</button>
+					{/each}
+				</div>
+			{/if}
+
 			{#if !chartLoading && categorySpending.items.length > 0}
 				<div class="chart-total">
 					<span class="chart-total-label">Total</span>
@@ -579,5 +609,49 @@
 		display: flex;
 		gap: 2rem;
 		flex-wrap: wrap;
+	}
+
+	/* Tag filter pills */
+	.tag-filter-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin: 0.6rem 0 0.25rem;
+	}
+
+	.tag-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.25rem 0.65rem;
+		border-radius: 999px;
+		border: 1.5px solid var(--tag-color, #64748b);
+		background: transparent;
+		color: var(--tag-color, #64748b);
+		font-size: 0.8rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition:
+			background 0.12s,
+			color 0.12s;
+		line-height: 1.4;
+	}
+
+	.tag-pill:hover {
+		background: color-mix(in srgb, var(--tag-color, #64748b) 12%, transparent);
+	}
+
+	.tag-pill--active {
+		background: var(--tag-color, #64748b);
+		color: #fff;
+	}
+
+	.tag-dot {
+		display: inline-block;
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: currentColor;
+		flex-shrink: 0;
 	}
 </style>

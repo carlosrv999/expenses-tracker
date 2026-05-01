@@ -85,6 +85,7 @@ export interface ExpenseListFilters {
 	payment_method_id?: number;
 	start_date?: string;
 	end_date?: string;
+	tags?: number[];
 	limit?: number;
 	offset?: number;
 }

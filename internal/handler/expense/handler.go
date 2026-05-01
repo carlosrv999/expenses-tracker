@@ -146,7 +146,7 @@ func parseFilter(c *echo.Context) (repository.ExpenseFilter, error) {
 		f.PaymentMethodID = &id
 	}
 
-	// === NEW: Date range filters ===
+	// === Date range filters ===
 	if v := c.QueryParam("start_date"); v != "" {
 		t, err := parseDate(v)
 		if err != nil {
@@ -159,10 +159,20 @@ func parseFilter(c *echo.Context) (repository.ExpenseFilter, error) {
 		if err != nil {
 			return f, echo.NewHTTPError(http.StatusBadRequest, "invalid end_date. Use format YYYY-MM-DD (or RFC3339)")
 		}
-		// Make end_date inclusive of the entire day (critical for date-only inputs)
+		// Make end_date inclusive of the entire day
 		year, month, day := t.Date()
 		endOfDay := time.Date(year, month, day, 23, 59, 59, 999999999, t.Location())
 		f.EndDate = &endOfDay
+	}
+
+	// === NEW: Tags filter (supports ?tags=[1,3], ?tags=1,3 or ?tags=1&tags=3) ===
+	if tagValues := c.QueryParams()["tags"]; len(tagValues) > 0 {
+		tagStr := strings.Join(tagValues, ",")
+		tagIDs, err := parseTagIDs(tagStr)
+		if err != nil {
+			return f, echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid tags parameter: %v", err))
+		}
+		f.TagIDs = tagIDs
 	}
 
 	if v := c.QueryParam("limit"); v != "" {
@@ -319,6 +329,12 @@ func parseTagIDs(s string) ([]int64, error) {
 	if s == "" {
 		return nil, nil
 	}
+
+	// Support both "1,2,3" and "[1,2,3]" formats
+	if len(s) > 1 && s[0] == '[' && s[len(s)-1] == ']' {
+		s = s[1 : len(s)-1]
+	}
+
 	parts := strings.Split(s, ",")
 	ids := make([]int64, 0, len(parts))
 	for _, p := range parts {

@@ -24,6 +24,7 @@ type ExpenseFilter struct {
 	PaymentMethodID *int64
 	StartDate       *time.Time
 	EndDate         *time.Time
+	TagIDs          []int64
 	IncludeDeleted  bool
 	Limit           int
 	Offset          int
@@ -98,6 +99,18 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 		args = append(args, *f.EndDate)
 		conds = append(conds, fmt.Sprintf("expense_date <= $%d", len(args)))
 	}
+	// NEW: Tag filter (ANY of the provided tags)
+	if len(f.TagIDs) > 0 {
+		tagPlaceholders := make([]string, len(f.TagIDs))
+		for i, tagID := range f.TagIDs {
+			args = append(args, tagID)
+			tagPlaceholders[i] = fmt.Sprintf("$%d", len(args))
+		}
+		conds = append(conds, fmt.Sprintf(
+			`EXISTS (SELECT 1 FROM expense_tag et WHERE et.expense_id = expense.expense_id AND et.tag_id IN (%s))`,
+			strings.Join(tagPlaceholders, ", "),
+		))
+	}
 
 	where := ""
 	if len(conds) > 0 {
@@ -169,7 +182,6 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 		args = append(args, *f.PaymentMethodID)
 		conds = append(conds, fmt.Sprintf("payment_method_id = $%d", len(args)))
 	}
-
 	if f.StartDate != nil {
 		args = append(args, *f.StartDate)
 		conds = append(conds, fmt.Sprintf("expense_date >= $%d", len(args)))
@@ -177,6 +189,18 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 	if f.EndDate != nil {
 		args = append(args, *f.EndDate)
 		conds = append(conds, fmt.Sprintf("expense_date <= $%d", len(args)))
+	}
+	// NEW: Tag filter (identical to List() for consistency)
+	if len(f.TagIDs) > 0 {
+		tagPlaceholders := make([]string, len(f.TagIDs))
+		for i, tagID := range f.TagIDs {
+			args = append(args, tagID)
+			tagPlaceholders[i] = fmt.Sprintf("$%d", len(args))
+		}
+		conds = append(conds, fmt.Sprintf(
+			`EXISTS (SELECT 1 FROM expense_tag et WHERE et.expense_id = expense.expense_id AND et.tag_id IN (%s))`,
+			strings.Join(tagPlaceholders, ", "),
+		))
 	}
 
 	where := ""
