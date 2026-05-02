@@ -199,10 +199,12 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 				'parent_category_id', c.parent_category_id,
 				'category_name',      c.category_name,
 				'icon',               c.icon,
-				'color',              c.color
+				'color',              c.color,
+				'created_at',         c.created_at,
+				'updated_at',         c.updated_at
 			), NULL::jsonb) AS category`)
 		joins = append(joins, `LEFT JOIN category c ON c.category_id = e.category_id`)
-		groupByFields = append(groupByFields, `c.category_id, c.parent_category_id, c.category_name, c.icon, c.color`)
+		groupByFields = append(groupByFields, `c.category_id, c.parent_category_id, c.category_name, c.icon, c.color, c.created_at, c.updated_at`)
 	}
 
 	if includePaymentMethod {
@@ -211,10 +213,12 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 				'payment_method_id', pm.payment_method_id,
 				'method_name',       pm.method_name,
 				'method_type',       pm.method_type,
-				'icon',              pm.icon
+				'icon',              pm.icon,
+				'created_at',        pm.created_at,
+				'updated_at',        pm.updated_at
 			), NULL::jsonb) AS payment_method`)
 		joins = append(joins, `LEFT JOIN payment_method pm ON pm.payment_method_id = e.payment_method_id`)
-		groupByFields = append(groupByFields, `pm.payment_method_id, pm.method_name, pm.method_type, pm.icon`)
+		groupByFields = append(groupByFields, `pm.payment_method_id, pm.method_name, pm.method_type, pm.icon, pm.created_at, pm.updated_at`)
 	}
 
 	// Tags always included
@@ -225,7 +229,9 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 					'tag_id',     t.tag_id,
 					'tag_name',   t.tag_name,
 					'color',      t.color,
-					'icon',       t.icon
+					'icon',       t.icon,
+					'created_at', t.created_at,
+					'updated_at', t.updated_at
 				)
 			) FILTER (WHERE t.tag_id IS NOT NULL),
 			'[]'::jsonb
