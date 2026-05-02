@@ -53,6 +53,7 @@ export interface PaymentMethodInput {
 	icon?: string | null;
 }
 
+// Add these to the existing Expense interface
 export interface Expense {
 	expense_id: number;
 	category_id: number;
@@ -67,6 +68,10 @@ export interface Expense {
 	deleted_at: string | null;
 	tag_ids?: number[];
 	tags?: Tag[];
+
+	// NEW: Embedded full objects (returned when ?relations=category,payment_method is used)
+	category?: Category;
+	payment_method?: PaymentMethod;
 }
 
 export interface ExpenseInput {
@@ -88,4 +93,5 @@ export interface ExpenseListFilters {
 	tags?: number[];
 	limit?: number;
 	offset?: number;
+	relations?: string[]; // ← NEW
 }
