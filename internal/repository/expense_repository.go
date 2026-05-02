@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -85,21 +86,21 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 	}
 	if f.CategoryID != nil {
 		args = append(args, *f.CategoryID)
-		conds = append(conds, fmt.Sprintf("category_id = $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.category_id = $%d", len(args)))
 	}
 	if f.PaymentMethodID != nil {
 		args = append(args, *f.PaymentMethodID)
-		conds = append(conds, fmt.Sprintf("payment_method_id = $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.payment_method_id = $%d", len(args)))
 	}
 	if f.StartDate != nil {
 		args = append(args, *f.StartDate)
-		conds = append(conds, fmt.Sprintf("expense_date >= $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.expense_date >= $%d", len(args)))
 	}
 	if f.EndDate != nil {
 		args = append(args, *f.EndDate)
-		conds = append(conds, fmt.Sprintf("expense_date <= $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.expense_date <= $%d", len(args)))
 	}
-	// NEW: Tag filter (ANY of the provided tags)
+	// Tag filter (ANY of the provided tags) – now uses alias e.
 	if len(f.TagIDs) > 0 {
 		tagPlaceholders := make([]string, len(f.TagIDs))
 		for i, tagID := range f.TagIDs {
@@ -107,7 +108,7 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 			tagPlaceholders[i] = fmt.Sprintf("$%d", len(args))
 		}
 		conds = append(conds, fmt.Sprintf(
-			`EXISTS (SELECT 1 FROM expense_tag et WHERE et.expense_id = expense.expense_id AND et.tag_id IN (%s))`,
+			`EXISTS (SELECT 1 FROM expense_tag et WHERE et.expense_id = e.expense_id AND et.tag_id IN (%s))`,
 			strings.Join(tagPlaceholders, ", "),
 		))
 	}
@@ -128,11 +129,30 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 	offsetPlaceholder := fmt.Sprintf("$%d", len(args))
 
 	q := fmt.Sprintf(`
-		SELECT expense_id, category_id, payment_method_id, currency, amount, expense_date,
-		       merchant_name, description, created_at, updated_at, deleted_at
-		FROM expense
+		SELECT 
+			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount, 
+			e.expense_date, e.merchant_name, e.description, 
+			e.created_at, e.updated_at, e.deleted_at,
+			COALESCE(
+				jsonb_agg(
+					jsonb_build_object(
+						'tag_id',     t.tag_id,
+						'tag_name',   t.tag_name,
+						'color',      t.color,
+						'icon',       t.icon
+					)
+				) FILTER (WHERE t.tag_id IS NOT NULL),
+				'[]'::jsonb
+			) AS tags
+		FROM expense e
+		LEFT JOIN expense_tag et ON et.expense_id = e.expense_id
+		LEFT JOIN tag t ON t.tag_id = et.tag_id
 		%s
-		ORDER BY expense_date DESC, expense_id DESC
+		GROUP BY 
+			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount,
+			e.expense_date, e.merchant_name, e.description, 
+			e.created_at, e.updated_at, e.deleted_at
+		ORDER BY e.expense_date DESC, e.expense_id DESC
 		LIMIT %s OFFSET %s`, where, limitPlaceholder, offsetPlaceholder)
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
@@ -144,11 +164,18 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 	var out []model.Expense
 	for rows.Next() {
 		var e model.Expense
+		var tagsJSON []byte
 		if err := rows.Scan(
 			&e.ExpenseID, &e.CategoryID, &e.PaymentMethodID, &e.Currency, &e.Amount, &e.ExpenseDate,
 			&e.MerchantName, &e.Description, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
+			&tagsJSON,
 		); err != nil {
 			return nil, err
+		}
+		if len(tagsJSON) > 0 {
+			if err := json.Unmarshal(tagsJSON, &e.Tags); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal tags for expense %d: %w", e.ExpenseID, err)
+			}
 		}
 		out = append(out, e)
 	}
@@ -171,26 +198,27 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 		args  []any
 	)
 
+	// Count + data query now use the SAME alias 'e' everywhere → no more Postgres error
 	if !f.IncludeDeleted {
-		conds = append(conds, "deleted_at IS NULL")
+		conds = append(conds, "e.deleted_at IS NULL")
 	}
 	if f.CategoryID != nil {
 		args = append(args, *f.CategoryID)
-		conds = append(conds, fmt.Sprintf("category_id = $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.category_id = $%d", len(args)))
 	}
 	if f.PaymentMethodID != nil {
 		args = append(args, *f.PaymentMethodID)
-		conds = append(conds, fmt.Sprintf("payment_method_id = $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.payment_method_id = $%d", len(args)))
 	}
 	if f.StartDate != nil {
 		args = append(args, *f.StartDate)
-		conds = append(conds, fmt.Sprintf("expense_date >= $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.expense_date >= $%d", len(args)))
 	}
 	if f.EndDate != nil {
 		args = append(args, *f.EndDate)
-		conds = append(conds, fmt.Sprintf("expense_date <= $%d", len(args)))
+		conds = append(conds, fmt.Sprintf("e.expense_date <= $%d", len(args)))
 	}
-	// NEW: Tag filter (identical to List() for consistency)
+	// Tag filter (ANY of the provided tags) – consistent alias 'e'
 	if len(f.TagIDs) > 0 {
 		tagPlaceholders := make([]string, len(f.TagIDs))
 		for i, tagID := range f.TagIDs {
@@ -198,7 +226,7 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 			tagPlaceholders[i] = fmt.Sprintf("$%d", len(args))
 		}
 		conds = append(conds, fmt.Sprintf(
-			`EXISTS (SELECT 1 FROM expense_tag et WHERE et.expense_id = expense.expense_id AND et.tag_id IN (%s))`,
+			`EXISTS (SELECT 1 FROM expense_tag et WHERE et.expense_id = e.expense_id AND et.tag_id IN (%s))`,
 			strings.Join(tagPlaceholders, ", "),
 		))
 	}
@@ -208,10 +236,10 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 		where = "WHERE " + strings.Join(conds, " AND ")
 	}
 
-	// 1. Get total count (same filters, no LIMIT/OFFSET)
+	// 1. Get total count (now uses alias e)
 	countQuery := fmt.Sprintf(`
         SELECT COUNT(*)
-        FROM expense
+        FROM expense e
         %s`, where)
 
 	var totalCount int64
@@ -233,15 +261,34 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 	dataArgs = append(dataArgs, f.Offset)
 	offsetPlaceholder := fmt.Sprintf("$%d", len(dataArgs))
 
-	query := fmt.Sprintf(`
-        SELECT expense_id, category_id, payment_method_id, currency, amount, expense_date,
-               merchant_name, description, created_at, updated_at, deleted_at
-        FROM expense
-        %s
-        ORDER BY expense_date DESC, expense_id DESC
-        LIMIT %s OFFSET %s`, where, limitPlaceholder, offsetPlaceholder)
+	dataQuery := fmt.Sprintf(`
+		SELECT 
+			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount, 
+			e.expense_date, e.merchant_name, e.description, 
+			e.created_at, e.updated_at, e.deleted_at,
+			COALESCE(
+				jsonb_agg(
+					jsonb_build_object(
+						'tag_id',     t.tag_id,
+						'tag_name',   t.tag_name,
+						'color',      t.color,
+						'icon',       t.icon
+					)
+				) FILTER (WHERE t.tag_id IS NOT NULL),
+				'[]'::jsonb
+			) AS tags
+		FROM expense e
+		LEFT JOIN expense_tag et ON et.expense_id = e.expense_id
+		LEFT JOIN tag t ON t.tag_id = et.tag_id
+		%s
+		GROUP BY 
+			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount,
+			e.expense_date, e.merchant_name, e.description, 
+			e.created_at, e.updated_at, e.deleted_at
+		ORDER BY e.expense_date DESC, e.expense_id DESC
+		LIMIT %s OFFSET %s`, where, limitPlaceholder, offsetPlaceholder)
 
-	rows, err := r.db.QueryContext(ctx, query, dataArgs...)
+	rows, err := r.db.QueryContext(ctx, dataQuery, dataArgs...)
 	if err != nil {
 		return PaginatedExpenseList{}, err
 	}
@@ -250,11 +297,18 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 	var expenses []model.Expense
 	for rows.Next() {
 		var e model.Expense
+		var tagsJSON []byte
 		if err := rows.Scan(
 			&e.ExpenseID, &e.CategoryID, &e.PaymentMethodID, &e.Currency, &e.Amount, &e.ExpenseDate,
 			&e.MerchantName, &e.Description, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
+			&tagsJSON,
 		); err != nil {
 			return PaginatedExpenseList{}, err
+		}
+		if len(tagsJSON) > 0 {
+			if err := json.Unmarshal(tagsJSON, &e.Tags); err != nil {
+				return PaginatedExpenseList{}, fmt.Errorf("failed to unmarshal tags for expense %d: %w", e.ExpenseID, err)
+			}
 		}
 		expenses = append(expenses, e)
 	}

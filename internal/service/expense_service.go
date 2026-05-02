@@ -50,11 +50,7 @@ func (s *ExpenseService) List(ctx context.Context, f repository.ExpenseFilter) (
 	if err != nil {
 		return nil, err
 	}
-	for i := range expenses {
-		if err := s.attachTags(ctx, &expenses[i]); err != nil {
-			return nil, err
-		}
-	}
+	// Tags are now populated by the repository (single query – no N+1)
 	return expenses, nil
 }
 
@@ -65,13 +61,7 @@ func (s *ExpenseService) ListPaginated(ctx context.Context, f repository.Expense
 	if err != nil {
 		return repository.PaginatedExpenseList{}, err
 	}
-
-	for i := range result.Expenses {
-		if err := s.attachTags(ctx, &result.Expenses[i]); err != nil {
-			return repository.PaginatedExpenseList{}, err
-		}
-	}
-
+	// Tags are now populated by the repository (single query – no N+1)
 	return result, nil
 }
 
