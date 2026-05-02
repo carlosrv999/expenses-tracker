@@ -38,6 +38,8 @@ func (h *Handler) Register(g *echo.Group) {
 }
 
 // Updated: now uses ListPaginated (full pagination metadata + tags attached)
+// Supports the new ?relations=category,payment_method query parameter
+// (or repeated ?relations=category&relations=payment_method).
 func (h *Handler) list(c *echo.Context) error {
 	f, err := parseFilter(c)
 	if err != nil {
@@ -165,7 +167,7 @@ func parseFilter(c *echo.Context) (repository.ExpenseFilter, error) {
 		f.EndDate = &endOfDay
 	}
 
-	// === NEW: Tags filter (supports ?tags=[1,3], ?tags=1,3 or ?tags=1&tags=3) ===
+	// === Tags filter (supports ?tags=[1,3], ?tags=1,3 or ?tags=1&tags=3) ===
 	if tagValues := c.QueryParams()["tags"]; len(tagValues) > 0 {
 		tagStr := strings.Join(tagValues, ",")
 		tagIDs, err := parseTagIDs(tagStr)
@@ -173,6 +175,24 @@ func parseFilter(c *echo.Context) (repository.ExpenseFilter, error) {
 			return f, echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid tags parameter: %v", err))
 		}
 		f.TagIDs = tagIDs
+	}
+
+	// === NEW: Relations support (category / payment_method) ===
+	// Supports both styles:
+	//   ?relations=category,payment_method
+	//   ?relations=category&relations=payment_method
+	if relationsValues := c.QueryParams()["relations"]; len(relationsValues) > 0 {
+		var relations []string
+		for _, val := range relationsValues {
+			parts := strings.Split(val, ",")
+			for _, part := range parts {
+				trimmed := strings.TrimSpace(part)
+				if trimmed != "" {
+					relations = append(relations, trimmed)
+				}
+			}
+		}
+		f.Relations = relations
 	}
 
 	if v := c.QueryParam("limit"); v != "" {

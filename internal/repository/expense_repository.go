@@ -29,6 +29,25 @@ type ExpenseFilter struct {
 	IncludeDeleted  bool
 	Limit           int
 	Offset          int
+
+	// Relations allows the caller (usually the HTTP handler) to request optional
+	// Many-to-One relations to be included in the response.
+	// Supported values: "category", "payment_method"
+	// Tags are *always* included (via JSON aggregation).
+	// Example: ?relations=category,payment_method or ?relations=category&relations=payment_method
+	// Backwards-compatible: if empty/nil, only expense + tags are returned (same as before).
+	Relations []string
+}
+
+// contains is a small helper (add it near the ExpenseFilter type, e.g. after the struct).
+// Case-insensitive to make query param handling more robust.
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(s, item) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *ExpenseRepository) Create(ctx context.Context, e *model.Expense, tagIDs []int64) error {
@@ -82,7 +101,7 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 	)
 
 	if !f.IncludeDeleted {
-		conds = append(conds, "deleted_at IS NULL")
+		conds = append(conds, "e.deleted_at IS NULL")
 	}
 	if f.CategoryID != nil {
 		args = append(args, *f.CategoryID)
@@ -100,7 +119,7 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 		args = append(args, *f.EndDate)
 		conds = append(conds, fmt.Sprintf("e.expense_date <= $%d", len(args)))
 	}
-	// Tag filter (ANY of the provided tags) – now uses alias e.
+	// Tag filter (ANY of the provided tags)
 	if len(f.TagIDs) > 0 {
 		tagPlaceholders := make([]string, len(f.TagIDs))
 		for i, tagID := range f.TagIDs {
@@ -118,6 +137,64 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 		where = "WHERE " + strings.Join(conds, " AND ")
 	}
 
+	// === NEW: Dynamic query parts for optional relations (backwards compatible) ===
+	includeCategory := contains(f.Relations, "category")
+	includePaymentMethod := contains(f.Relations, "payment_method")
+
+	selectFields := []string{
+		`e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount, 
+		 e.expense_date, e.merchant_name, e.description, 
+		 e.created_at, e.updated_at, e.deleted_at`,
+	}
+	joins := []string{
+		`LEFT JOIN expense_tag et ON et.expense_id = e.expense_id`,
+		`LEFT JOIN tag t ON t.tag_id = et.tag_id`,
+	}
+	groupByFields := []string{
+		`e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount,
+		 e.expense_date, e.merchant_name, e.description, 
+		 e.created_at, e.updated_at, e.deleted_at`,
+	}
+
+	if includeCategory {
+		selectFields = append(selectFields, `
+			COALESCE(jsonb_build_object(
+				'category_id',        c.category_id,
+				'parent_category_id', c.parent_category_id,
+				'category_name',      c.category_name,
+				'icon',               c.icon,
+				'color',              c.color
+			), NULL::jsonb) AS category`)
+		joins = append(joins, `LEFT JOIN category c ON c.category_id = e.category_id`)
+		groupByFields = append(groupByFields, `c.category_id, c.parent_category_id, c.category_name, c.icon, c.color`)
+	}
+
+	if includePaymentMethod {
+		selectFields = append(selectFields, `
+			COALESCE(jsonb_build_object(
+				'payment_method_id', pm.payment_method_id,
+				'method_name',       pm.method_name,
+				'method_type',       pm.method_type,
+				'icon',              pm.icon
+			), NULL::jsonb) AS payment_method`)
+		joins = append(joins, `LEFT JOIN payment_method pm ON pm.payment_method_id = e.payment_method_id`)
+		groupByFields = append(groupByFields, `pm.payment_method_id, pm.method_name, pm.method_type, pm.icon`)
+	}
+
+	// Tags are always included
+	selectFields = append(selectFields, `
+		COALESCE(
+			jsonb_agg(
+				jsonb_build_object(
+					'tag_id',     t.tag_id,
+					'tag_name',   t.tag_name,
+					'color',      t.color,
+					'icon',       t.icon
+				)
+			) FILTER (WHERE t.tag_id IS NOT NULL),
+			'[]'::jsonb
+		) AS tags`)
+
 	limit := 100
 	if f.Limit > 0 && f.Limit <= 500 {
 		limit = f.Limit
@@ -130,30 +207,20 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 
 	q := fmt.Sprintf(`
 		SELECT 
-			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount, 
-			e.expense_date, e.merchant_name, e.description, 
-			e.created_at, e.updated_at, e.deleted_at,
-			COALESCE(
-				jsonb_agg(
-					jsonb_build_object(
-						'tag_id',     t.tag_id,
-						'tag_name',   t.tag_name,
-						'color',      t.color,
-						'icon',       t.icon
-					)
-				) FILTER (WHERE t.tag_id IS NOT NULL),
-				'[]'::jsonb
-			) AS tags
+			%s
 		FROM expense e
-		LEFT JOIN expense_tag et ON et.expense_id = e.expense_id
-		LEFT JOIN tag t ON t.tag_id = et.tag_id
+		%s
 		%s
 		GROUP BY 
-			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount,
-			e.expense_date, e.merchant_name, e.description, 
-			e.created_at, e.updated_at, e.deleted_at
+			%s
 		ORDER BY e.expense_date DESC, e.expense_id DESC
-		LIMIT %s OFFSET %s`, where, limitPlaceholder, offsetPlaceholder)
+		LIMIT %s OFFSET %s`,
+		strings.Join(selectFields, ", "),
+		strings.Join(joins, "\n\t\t"),
+		where,
+		strings.Join(groupByFields, ", "),
+		limitPlaceholder,
+		offsetPlaceholder)
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -165,18 +232,49 @@ func (r *ExpenseRepository) List(ctx context.Context, f ExpenseFilter) ([]model.
 	for rows.Next() {
 		var e model.Expense
 		var tagsJSON []byte
-		if err := rows.Scan(
-			&e.ExpenseID, &e.CategoryID, &e.PaymentMethodID, &e.Currency, &e.Amount, &e.ExpenseDate,
-			&e.MerchantName, &e.Description, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
-			&tagsJSON,
-		); err != nil {
+		var categoryJSON, paymentMethodJSON []byte
+
+		// Dynamic scan destinations (order must match SELECT columns)
+		scanArgs := []interface{}{
+			&e.ExpenseID, &e.CategoryID, &e.PaymentMethodID, &e.Currency, &e.Amount,
+			&e.ExpenseDate, &e.MerchantName, &e.Description,
+			&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
+		}
+		if includeCategory {
+			scanArgs = append(scanArgs, &categoryJSON)
+		}
+		if includePaymentMethod {
+			scanArgs = append(scanArgs, &paymentMethodJSON)
+		}
+		scanArgs = append(scanArgs, &tagsJSON)
+
+		if err := rows.Scan(scanArgs...); err != nil {
 			return nil, err
 		}
+
+		// Always unmarshal tags
 		if len(tagsJSON) > 0 {
 			if err := json.Unmarshal(tagsJSON, &e.Tags); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal tags for expense %d: %w", e.ExpenseID, err)
 			}
 		}
+
+		// Optional relations (only if requested — backwards compatible)
+		if includeCategory && len(categoryJSON) > 0 {
+			var cat model.Category
+			if err := json.Unmarshal(categoryJSON, &cat); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal category for expense %d: %w", e.ExpenseID, err)
+			}
+			e.Category = &cat
+		}
+		if includePaymentMethod && len(paymentMethodJSON) > 0 {
+			var pm model.PaymentMethod
+			if err := json.Unmarshal(paymentMethodJSON, &pm); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal payment method for expense %d: %w", e.ExpenseID, err)
+			}
+			e.PaymentMethod = &pm
+		}
+
 		out = append(out, e)
 	}
 	return out, rows.Err()
@@ -247,7 +345,7 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 		return PaginatedExpenseList{}, err
 	}
 
-	// 2. Get the actual paginated rows
+	// 2. Get the actual paginated rows — now with optional relations support
 	limit := 100
 	if f.Limit > 0 && f.Limit <= 500 {
 		limit = f.Limit
@@ -261,32 +359,80 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 	dataArgs = append(dataArgs, f.Offset)
 	offsetPlaceholder := fmt.Sprintf("$%d", len(dataArgs))
 
+	// === SAME dynamic query building as in List() ===
+	includeCategory := contains(f.Relations, "category")
+	includePaymentMethod := contains(f.Relations, "payment_method")
+
+	selectFields := []string{
+		`e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount, 
+		 e.expense_date, e.merchant_name, e.description, 
+		 e.created_at, e.updated_at, e.deleted_at`,
+	}
+	joins := []string{
+		`LEFT JOIN expense_tag et ON et.expense_id = e.expense_id`,
+		`LEFT JOIN tag t ON t.tag_id = et.tag_id`,
+	}
+	groupByFields := []string{
+		`e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount,
+		 e.expense_date, e.merchant_name, e.description, 
+		 e.created_at, e.updated_at, e.deleted_at`,
+	}
+
+	if includeCategory {
+		selectFields = append(selectFields, `
+			COALESCE(jsonb_build_object(
+				'category_id',        c.category_id,
+				'parent_category_id', c.parent_category_id,
+				'category_name',      c.category_name,
+				'icon',               c.icon,
+				'color',              c.color
+			), NULL::jsonb) AS category`)
+		joins = append(joins, `LEFT JOIN category c ON c.category_id = e.category_id`)
+		groupByFields = append(groupByFields, `c.category_id, c.parent_category_id, c.category_name, c.icon, c.color`)
+	}
+
+	if includePaymentMethod {
+		selectFields = append(selectFields, `
+			COALESCE(jsonb_build_object(
+				'payment_method_id', pm.payment_method_id,
+				'method_name',       pm.method_name,
+				'method_type',       pm.method_type,
+				'icon',              pm.icon
+			), NULL::jsonb) AS payment_method`)
+		joins = append(joins, `LEFT JOIN payment_method pm ON pm.payment_method_id = e.payment_method_id`)
+		groupByFields = append(groupByFields, `pm.payment_method_id, pm.method_name, pm.method_type, pm.icon`)
+	}
+
+	// Tags always included
+	selectFields = append(selectFields, `
+		COALESCE(
+			jsonb_agg(
+				jsonb_build_object(
+					'tag_id',     t.tag_id,
+					'tag_name',   t.tag_name,
+					'color',      t.color,
+					'icon',       t.icon
+				)
+			) FILTER (WHERE t.tag_id IS NOT NULL),
+			'[]'::jsonb
+		) AS tags`)
+
 	dataQuery := fmt.Sprintf(`
 		SELECT 
-			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount, 
-			e.expense_date, e.merchant_name, e.description, 
-			e.created_at, e.updated_at, e.deleted_at,
-			COALESCE(
-				jsonb_agg(
-					jsonb_build_object(
-						'tag_id',     t.tag_id,
-						'tag_name',   t.tag_name,
-						'color',      t.color,
-						'icon',       t.icon
-					)
-				) FILTER (WHERE t.tag_id IS NOT NULL),
-				'[]'::jsonb
-			) AS tags
+			%s
 		FROM expense e
-		LEFT JOIN expense_tag et ON et.expense_id = e.expense_id
-		LEFT JOIN tag t ON t.tag_id = et.tag_id
+		%s
 		%s
 		GROUP BY 
-			e.expense_id, e.category_id, e.payment_method_id, e.currency, e.amount,
-			e.expense_date, e.merchant_name, e.description, 
-			e.created_at, e.updated_at, e.deleted_at
+			%s
 		ORDER BY e.expense_date DESC, e.expense_id DESC
-		LIMIT %s OFFSET %s`, where, limitPlaceholder, offsetPlaceholder)
+		LIMIT %s OFFSET %s`,
+		strings.Join(selectFields, ", "),
+		strings.Join(joins, "\n\t\t"),
+		where,
+		strings.Join(groupByFields, ", "),
+		limitPlaceholder,
+		offsetPlaceholder)
 
 	rows, err := r.db.QueryContext(ctx, dataQuery, dataArgs...)
 	if err != nil {
@@ -298,18 +444,49 @@ func (r *ExpenseRepository) ListPaginated(ctx context.Context, f ExpenseFilter) 
 	for rows.Next() {
 		var e model.Expense
 		var tagsJSON []byte
-		if err := rows.Scan(
-			&e.ExpenseID, &e.CategoryID, &e.PaymentMethodID, &e.Currency, &e.Amount, &e.ExpenseDate,
-			&e.MerchantName, &e.Description, &e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
-			&tagsJSON,
-		); err != nil {
+		var categoryJSON, paymentMethodJSON []byte
+
+		// Dynamic scan (exact same logic as List)
+		scanArgs := []interface{}{
+			&e.ExpenseID, &e.CategoryID, &e.PaymentMethodID, &e.Currency, &e.Amount,
+			&e.ExpenseDate, &e.MerchantName, &e.Description,
+			&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
+		}
+		if includeCategory {
+			scanArgs = append(scanArgs, &categoryJSON)
+		}
+		if includePaymentMethod {
+			scanArgs = append(scanArgs, &paymentMethodJSON)
+		}
+		scanArgs = append(scanArgs, &tagsJSON)
+
+		if err := rows.Scan(scanArgs...); err != nil {
 			return PaginatedExpenseList{}, err
 		}
+
+		// Unmarshal tags (always)
 		if len(tagsJSON) > 0 {
 			if err := json.Unmarshal(tagsJSON, &e.Tags); err != nil {
 				return PaginatedExpenseList{}, fmt.Errorf("failed to unmarshal tags for expense %d: %w", e.ExpenseID, err)
 			}
 		}
+
+		// Optional relations
+		if includeCategory && len(categoryJSON) > 0 {
+			var cat model.Category
+			if err := json.Unmarshal(categoryJSON, &cat); err != nil {
+				return PaginatedExpenseList{}, fmt.Errorf("failed to unmarshal category for expense %d: %w", e.ExpenseID, err)
+			}
+			e.Category = &cat
+		}
+		if includePaymentMethod && len(paymentMethodJSON) > 0 {
+			var pm model.PaymentMethod
+			if err := json.Unmarshal(paymentMethodJSON, &pm); err != nil {
+				return PaginatedExpenseList{}, fmt.Errorf("failed to unmarshal payment method for expense %d: %w", e.ExpenseID, err)
+			}
+			e.PaymentMethod = &pm
+		}
+
 		expenses = append(expenses, e)
 	}
 
