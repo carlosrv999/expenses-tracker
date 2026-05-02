@@ -45,15 +45,6 @@ func (s *ExpenseService) Get(ctx context.Context, id int64) (*model.Expense, err
 	return e, nil
 }
 
-func (s *ExpenseService) List(ctx context.Context, f repository.ExpenseFilter) ([]model.Expense, error) {
-	expenses, err := s.expenses.List(ctx, f)
-	if err != nil {
-		return nil, err
-	}
-	// Tags are now populated by the repository (single query – no N+1)
-	return expenses, nil
-}
-
 // ListPaginated returns a paginated list of expenses (with full metadata) and attaches
 // the associated tags to every expense in the result — exactly like the non-paginated List method.
 func (s *ExpenseService) ListPaginated(ctx context.Context, f repository.ExpenseFilter) (repository.PaginatedExpenseList, error) {
