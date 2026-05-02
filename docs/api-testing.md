@@ -99,6 +99,27 @@ curl -s "http://localhost:8080/api/v1/expenses?payment_method_id=1&offset=0&limi
 curl -s "http://localhost:8080/api/v1/expenses?start_date=2025-04-01&end_date=2025-04-30" | jq
 ```
 
+### Relations parameter (embed full objects)
+
+The new `relations` query parameter lets you include the full `category` and/or `payment_method` objects in the response (instead of just the IDs).
+
+```bash
+# Only expense + tags (default / backwards compatible)
+curl -s "http://localhost:8080/api/v1/expenses?limit=5" | jq
+
+# Include full category object
+curl -s "http://localhost:8080/api/v1/expenses?relations=category&limit=5" | jq
+
+# Include full payment_method object
+curl -s "http://localhost:8080/api/v1/expenses?relations=payment_method&limit=5" | jq
+
+# Include both (comma-separated - most common)
+curl -s "http://localhost:8080/api/v1/expenses?relations=category,payment_method&limit=5" | jq
+
+# Include both (repeated parameters - also fully supported)
+curl -s "http://localhost:8080/api/v1/expenses?relations=category&relations=payment_method&limit=5" | jq
+```
+
 ### 2. Create a new expense
 
 ```bash

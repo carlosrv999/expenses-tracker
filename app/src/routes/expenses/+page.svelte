@@ -49,12 +49,13 @@
 		try {
 			const filters: ExpenseListFilters = {
 				limit: filterLimit,
-				offset: offset
+				offset: offset,
+				relations: ['category', 'payment_method'] // ← NEW: ask backend to embed full objects
 			};
 			if (filterCategory !== '') filters.category_id = filterCategory;
 			if (filterPm !== '') filters.payment_method_id = filterPm;
-			if (filterStartDate) filters.start_date = filterStartDate; // ← NEW
-			if (filterEndDate) filters.end_date = filterEndDate; // ← NEW
+			if (filterStartDate) filters.start_date = filterStartDate;
+			if (filterEndDate) filters.end_date = filterEndDate;
 
 			const paginatedResult = await expensesApi.list(filters);
 
@@ -226,8 +227,16 @@
 										<div class="muted small">{e.description}</div>
 									{/if}
 								</td>
-								<td>{categoryById.get(e.category_id)?.category_name ?? '—'}</td>
-								<td>{pmById.get(e.payment_method_id)?.method_name ?? '—'}</td>
+								<td
+									>{e.category?.category_name ??
+										categoryById.get(e.category_id)?.category_name ??
+										'—'}</td
+								>
+								<td
+									>{e.payment_method?.method_name ??
+										pmById.get(e.payment_method_id)?.method_name ??
+										'—'}</td
+								>
 								<td>
 									{#each getExpenseTags(e) as tag (tag.tag_id)}
 										<span class="badge">

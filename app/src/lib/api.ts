@@ -47,7 +47,16 @@ function toQuery(params: Record<string, unknown>): string {
 	const usp = new URLSearchParams();
 	for (const [key, value] of Object.entries(params)) {
 		if (value === undefined || value === null || value === '') continue;
-		usp.set(key, String(value));
+
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				if (item !== undefined && item !== null && item !== '') {
+					usp.append(key, String(item));
+				}
+			}
+		} else {
+			usp.set(key, String(value));
+		}
 	}
 	const s = usp.toString();
 	return s ? `?${s}` : '';
